@@ -1,0 +1,37 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recorder</title>
+  <script src="app.js"></script>
+</head>
+<body>
+    <div id="app"></div>
+    <script>
+        var app = Elm.Main.init({
+            node: document.getElementById("app"),
+            flags: {}
+        });
+
+    app.ports.eventToJs.subscribe(function(msg) {
+        switch (msg.event) {
+            case "started":
+                app.ports.eventFromJs.send({
+                    event: "started",
+                    id: msg.id
+                });
+                break;
+            case "stopped":
+                app.ports.eventFromJs.send({
+                    event: "stopped",
+                    id: msg.id
+                });
+                break;
+            default:
+                console.log("ops", msg);
+        }
+    });
+
+    </script>
+</body>
+</html>

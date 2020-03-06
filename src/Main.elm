@@ -66,6 +66,11 @@ type alias Model =
     }
 
 
+type RecorderEvent
+    = StartedEvent ID
+    | StoppedEvent ID
+
+
 type Msg
     = TitleChanged String
     | LengthChanged String
@@ -73,9 +78,7 @@ type Msg
     | StopClicked
     | Tick ID
     | NewClicked
-    | StoppedEvent ID
-    | StartedEvent ID
-    | NoOp
+    | FromRecorder (Maybe RecorderEvent)
 
 
 initialStatus : Status
@@ -146,7 +149,7 @@ update msg ({ status, nextId } as model) =
         ( Initalized { title, length }, RecordClicked ) ->
             ( { model | nextId = nextId + 1 }, sendStartedEvent nextId )
 
-        ( Initalized { title, length }, StartedEvent id ) ->
+        ( Initalized { title, length }, FromRecorder (Just (StartedEvent id)) ) ->
             let
                 item =
                     { title = title
@@ -161,15 +164,15 @@ update msg ({ status, nextId } as model) =
         ( Recording item _, StopClicked ) ->
             ( { model | status = Success item }, sendStoppedEvent item.id )
 
-        ( Recording ({ id } as item) _, StoppedEvent id_ ) ->
-            if id == id_ then
+        ( Recording item _, FromRecorder (Just (StoppedEvent id)) ) ->
+            if item.id == id then
                 ( { model | status = Success item }, Cmd.none )
 
             else
                 ( model, Cmd.none )
 
-        ( Recording ({ id } as item) (DownCounter remaining), Tick id_ ) ->
-            case ( id == id_, remaining ) of
+        ( Recording item (DownCounter remaining), Tick id ) ->
+            case ( item.id == id, remaining ) of
                 ( False, _ ) ->
                     ( model, Cmd.none )
 
@@ -270,11 +273,11 @@ eventObject event id =
 
 
 sendStartedEvent id =
-    eventToJs (eventObject "started" id)
+    toRecorder (eventObject "started" id)
 
 
 sendStoppedEvent id =
-    eventToJs (eventObject "stopped" id)
+    toRecorder (eventObject "stopped" id)
 
 
 decodeEvent =
@@ -283,32 +286,35 @@ decodeEvent =
         (Decode.field "id" Decode.int)
 
 
-mapEventFromJs : Decode.Value -> Msg
-mapEventFromJs json =
+mapToRecorderEvent : Decode.Value -> Maybe RecorderEvent
+mapToRecorderEvent json =
     case Debug.log "in" (Decode.decodeValue decodeEvent json) of
         Ok { event, id } ->
             case event of
                 "started" ->
-                    StartedEvent id
+                    Just <| StartedEvent id
 
                 "stopped" ->
-                    StoppedEvent id
+                    Just <| StoppedEvent id
 
                 _ ->
-                    NoOp
+                    Nothing
 
         Err err ->
-            NoOp
+            Nothing
 
 
-port eventToJs : Encode.Value -> Cmd msg
+port toRecorder : Encode.Value -> Cmd msg
 
 
-port eventFromJs : (Decode.Value -> msg) -> Sub msg
+port fromRecorder : (Decode.Value -> msg) -> Sub msg
 
 
+subscriptions : Model -> Sub Msg
 subscriptions model =
-    eventFromJs mapEventFromJs
+    Sub.batch
+        [ fromRecorder (FromRecorder << mapToRecorderEvent)
+        ]
 
 
 main =

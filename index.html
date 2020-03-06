@@ -13,24 +13,43 @@
             flags: {}
         });
 
-    app.ports.eventToJs.subscribe(function(msg) {
-        switch (msg.event) {
-            case "started":
-                app.ports.eventFromJs.send({
-                    event: "started",
-                    id: msg.id
-                });
-                break;
-            case "stopped":
-                app.ports.eventFromJs.send({
-                    event: "stopped",
-                    id: msg.id
-                });
-                break;
-            default:
-                console.log("ops", msg);
-        }
-    });
+        var recorder, gumStream;
+
+        app.ports.toRecorder.subscribe(function(msg) {
+            switch (msg.event) {
+                case "started":
+                    navigator.mediaDevices.getUserMedia({
+                        audio: true
+                    }).then(function(stream) {
+                        gumStream = stream;
+                        recorder = new MediaRecorder(stream);
+                        recorder.ondataavailable = function(e) {  // FIXME
+                            var url = URL.createObjectURL(e.data);
+                            var preview = document.createElement('audio');
+                            preview.controls = true;
+                            preview.src = url;
+                            document.body.appendChild(preview);
+                        };
+                        recorder.start(); // FIXME
+                        app.ports.fromRecorder.send({
+                            event: "started",
+                            id: msg.id
+                        });
+                    })
+
+                    break;
+                case "stopped":
+                    recorder.stop()
+                    gumStream.getAudioTracks()[0].stop(); // FIXME
+                    app.ports.fromRecorder.send({
+                        event: "stopped",
+                        id: msg.id
+                    });
+                    break;
+                default:
+                    console.log("ops", msg);
+            }
+        });
 
     </script>
 </body>

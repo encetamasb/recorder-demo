@@ -5160,9 +5160,17 @@ var $author$project$Main$init = function (flags) {
 		{nextId: 0, status: $author$project$Main$initialStatus},
 		$elm$core$Platform$Cmd$none);
 };
+var $author$project$Main$FromRecorder = function (a) {
+	return {$: 'FromRecorder', a: a};
+};
+var $elm$core$Platform$Sub$batch = _Platform_batch;
+var $elm$core$Basics$composeL = F3(
+	function (g, f, x) {
+		return g(
+			f(x));
+	});
 var $elm$json$Json$Decode$value = _Json_decodeValue;
-var $author$project$Main$eventFromJs = _Platform_incomingPort('eventFromJs', $elm$json$Json$Decode$value);
-var $author$project$Main$NoOp = {$: 'NoOp'};
+var $author$project$Main$fromRecorder = _Platform_incomingPort('fromRecorder', $elm$json$Json$Decode$value);
 var $author$project$Main$StartedEvent = function (a) {
 	return {$: 'StartedEvent', a: a};
 };
@@ -5182,7 +5190,7 @@ var $author$project$Main$decodeEvent = A3(
 	A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$int));
 var $elm$json$Json$Decode$decodeValue = _Json_run;
 var $elm$core$Debug$log = _Debug_log;
-var $author$project$Main$mapEventFromJs = function (json) {
+var $author$project$Main$mapToRecorderEvent = function (json) {
 	var _v0 = A2(
 		$elm$core$Debug$log,
 		'in',
@@ -5192,19 +5200,26 @@ var $author$project$Main$mapEventFromJs = function (json) {
 		var id = _v0.a.id;
 		switch (event) {
 			case 'started':
-				return $author$project$Main$StartedEvent(id);
+				return $elm$core$Maybe$Just(
+					$author$project$Main$StartedEvent(id));
 			case 'stopped':
-				return $author$project$Main$StoppedEvent(id);
+				return $elm$core$Maybe$Just(
+					$author$project$Main$StoppedEvent(id));
 			default:
-				return $author$project$Main$NoOp;
+				return $elm$core$Maybe$Nothing;
 		}
 	} else {
 		var err = _v0.a;
-		return $author$project$Main$NoOp;
+		return $elm$core$Maybe$Nothing;
 	}
 };
 var $author$project$Main$subscriptions = function (model) {
-	return $author$project$Main$eventFromJs($author$project$Main$mapEventFromJs);
+	return $elm$core$Platform$Sub$batch(
+		_List_fromArray(
+			[
+				$author$project$Main$fromRecorder(
+				A2($elm$core$Basics$composeL, $author$project$Main$FromRecorder, $author$project$Main$mapToRecorderEvent))
+			]));
 };
 var $author$project$Main$DownCounter = function (a) {
 	return {$: 'DownCounter', a: a};
@@ -5219,11 +5234,6 @@ var $author$project$Main$Recording = F2(
 var $author$project$Main$Success = function (a) {
 	return {$: 'Success', a: a};
 };
-var $elm$core$Basics$composeL = F3(
-	function (g, f, x) {
-		return g(
-			f(x));
-	});
 var $elm$core$Result$fromMaybe = F2(
 	function (err, maybe) {
 		if (maybe.$ === 'Just') {
@@ -5277,13 +5287,13 @@ var $author$project$Main$eventObject = F2(
 					$elm$json$Json$Encode$int(id))
 				]));
 	});
-var $author$project$Main$eventToJs = _Platform_outgoingPort('eventToJs', $elm$core$Basics$identity);
+var $author$project$Main$toRecorder = _Platform_outgoingPort('toRecorder', $elm$core$Basics$identity);
 var $author$project$Main$sendStartedEvent = function (id) {
-	return $author$project$Main$eventToJs(
+	return $author$project$Main$toRecorder(
 		A2($author$project$Main$eventObject, 'started', id));
 };
 var $author$project$Main$sendStoppedEvent = function (id) {
-	return $author$project$Main$eventToJs(
+	return $author$project$Main$toRecorder(
 		A2($author$project$Main$eventObject, 'stopped', id));
 };
 var $author$project$Main$Tick = function (a) {
@@ -5425,21 +5435,25 @@ var $author$project$Main$update = F2(
 									model,
 									{nextId: nextId + 1}),
 								$author$project$Main$sendStartedEvent(nextId));
-						case 'StartedEvent':
-							var title = _v0.a.a.title;
-							var length = _v0.a.a.length;
-							var id = _v0.b.a;
-							var item = {id: id, length: length, title: title};
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										status: A2(
-											$author$project$Main$Recording,
-											item,
-											$author$project$Main$DownCounter(length))
-									}),
-								$author$project$Main$tick(item.id));
+						case 'FromRecorder':
+							if ((_v0.b.a.$ === 'Just') && (_v0.b.a.a.$ === 'StartedEvent')) {
+								var title = _v0.a.a.title;
+								var length = _v0.a.a.length;
+								var id = _v0.b.a.a.a;
+								var item = {id: id, length: length, title: title};
+								return _Utils_Tuple2(
+									_Utils_update(
+										model,
+										{
+											status: A2(
+												$author$project$Main$Recording,
+												item,
+												$author$project$Main$DownCounter(length))
+										}),
+									$author$project$Main$tick(item.id));
+							} else {
+								break _v0$10;
+							}
 						default:
 							break _v0$10;
 					}
@@ -5456,26 +5470,28 @@ var $author$project$Main$update = F2(
 										status: $author$project$Main$Success(item)
 									}),
 								$author$project$Main$sendStoppedEvent(item.id));
-						case 'StoppedEvent':
-							var _v4 = _v0.a;
-							var item = _v4.a;
-							var id = item.id;
-							var id_ = _v0.b.a;
-							return _Utils_eq(id, id_) ? _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										status: $author$project$Main$Success(item)
-									}),
-								$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+						case 'FromRecorder':
+							if ((_v0.b.a.$ === 'Just') && (_v0.b.a.a.$ === 'StoppedEvent')) {
+								var _v4 = _v0.a;
+								var item = _v4.a;
+								var id = _v0.b.a.a.a;
+								return _Utils_eq(item.id, id) ? _Utils_Tuple2(
+									_Utils_update(
+										model,
+										{
+											status: $author$project$Main$Success(item)
+										}),
+									$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+							} else {
+								break _v0$10;
+							}
 						case 'Tick':
 							var _v5 = _v0.a;
 							var item = _v5.a;
-							var id = item.id;
 							var remaining = _v5.b.a;
-							var id_ = _v0.b.a;
+							var id = _v0.b.a;
 							var _v6 = _Utils_Tuple2(
-								_Utils_eq(id, id_),
+								_Utils_eq(item.id, id),
 								remaining);
 							if (!_v6.a) {
 								return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);

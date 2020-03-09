@@ -5171,46 +5171,92 @@ var $elm$core$Basics$composeL = F3(
 	});
 var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $author$project$Main$fromRecorder = _Platform_incomingPort('fromRecorder', $elm$json$Json$Decode$value);
+var $author$project$Main$DataChunkEvent = F2(
+	function (a, b) {
+		return {$: 'DataChunkEvent', a: a, b: b};
+	});
 var $author$project$Main$StartedEvent = function (a) {
 	return {$: 'StartedEvent', a: a};
 };
-var $author$project$Main$StoppedEvent = function (a) {
-	return {$: 'StoppedEvent', a: a};
-};
+var $author$project$Main$StoppedEvent = F2(
+	function (a, b) {
+		return {$: 'StoppedEvent', a: a, b: b};
+	});
 var $elm$json$Json$Decode$field = _Json_decodeField;
 var $elm$json$Json$Decode$int = _Json_decodeInt;
+var $elm$json$Json$Decode$map5 = _Json_map5;
+var $elm$json$Json$Decode$oneOf = _Json_oneOf;
+var $elm$json$Json$Decode$maybe = function (decoder) {
+	return $elm$json$Json$Decode$oneOf(
+		_List_fromArray(
+			[
+				A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, decoder),
+				$elm$json$Json$Decode$succeed($elm$core$Maybe$Nothing)
+			]));
+};
 var $elm$json$Json$Decode$string = _Json_decodeString;
-var $author$project$Main$decodeEvent = A3(
-	$elm$json$Json$Decode$map2,
-	F2(
-		function (event, id) {
-			return {event: event, id: id};
+var $author$project$Main$decodeEvent = A6(
+	$elm$json$Json$Decode$map5,
+	F5(
+		function (event, id, size, mime, url) {
+			return {event: event, id: id, maybeMime: mime, maybeSize: size, maybeUrl: url};
 		}),
 	A2($elm$json$Json$Decode$field, 'event', $elm$json$Json$Decode$string),
-	A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$int));
+	A2($elm$json$Json$Decode$field, 'id', $elm$json$Json$Decode$int),
+	$elm$json$Json$Decode$maybe(
+		A2($elm$json$Json$Decode$field, 'size', $elm$json$Json$Decode$int)),
+	$elm$json$Json$Decode$maybe(
+		A2($elm$json$Json$Decode$field, 'mime', $elm$json$Json$Decode$string)),
+	$elm$json$Json$Decode$maybe(
+		A2($elm$json$Json$Decode$field, 'url', $elm$json$Json$Decode$string)));
 var $elm$json$Json$Decode$decodeValue = _Json_run;
 var $elm$core$Debug$log = _Debug_log;
 var $author$project$Main$mapToRecorderEvent = function (json) {
 	var _v0 = A2(
 		$elm$core$Debug$log,
-		'in',
+		'a',
 		A2($elm$json$Json$Decode$decodeValue, $author$project$Main$decodeEvent, json));
 	if (_v0.$ === 'Ok') {
 		var event = _v0.a.event;
 		var id = _v0.a.id;
+		var maybeSize = _v0.a.maybeSize;
+		var maybeMime = _v0.a.maybeMime;
+		var maybeUrl = _v0.a.maybeUrl;
 		switch (event) {
 			case 'started':
-				return $elm$core$Maybe$Just(
+				return $elm$core$Result$Ok(
 					$author$project$Main$StartedEvent(id));
 			case 'stopped':
-				return $elm$core$Maybe$Just(
-					$author$project$Main$StoppedEvent(id));
+				var _v2 = _Utils_Tuple2(maybeMime, maybeUrl);
+				if ((_v2.a.$ === 'Just') && (_v2.b.$ === 'Just')) {
+					var mime = _v2.a.a;
+					var url = _v2.b.a;
+					return $elm$core$Result$Ok(
+						A2(
+							$author$project$Main$StoppedEvent,
+							id,
+							{mime: mime, url: url}));
+				} else {
+					return $elm$core$Result$Err('Missing data url or mime');
+				}
+			case 'datachunk':
+				if (maybeSize.$ === 'Just') {
+					var size = maybeSize.a;
+					return $elm$core$Result$Ok(
+						A2(
+							$author$project$Main$DataChunkEvent,
+							id,
+							{size: size}));
+				} else {
+					return $elm$core$Result$Err('Missing data size');
+				}
 			default:
-				return $elm$core$Maybe$Nothing;
+				var m = event;
+				return $elm$core$Result$Err('Unknown message (' + (m + ')'));
 		}
 	} else {
 		var err = _v0.a;
-		return $elm$core$Maybe$Nothing;
+		return $elm$core$Result$Err('Decoding error');
 	}
 };
 var $author$project$Main$subscriptions = function (model) {
@@ -5274,27 +5320,36 @@ var $elm$json$Json$Encode$object = function (pairs) {
 			pairs));
 };
 var $elm$json$Json$Encode$string = _Json_wrap;
-var $author$project$Main$eventObject = F2(
-	function (event, id) {
-		return $elm$json$Json$Encode$object(
+var $author$project$Main$toRecorder = _Platform_outgoingPort('toRecorder', $elm$core$Basics$identity);
+var $author$project$Main$sendStartedEvent = F2(
+	function (id, length) {
+		return $author$project$Main$toRecorder(
+			$elm$json$Json$Encode$object(
+				_List_fromArray(
+					[
+						_Utils_Tuple2(
+						'event',
+						$elm$json$Json$Encode$string('started')),
+						_Utils_Tuple2(
+						'id',
+						$elm$json$Json$Encode$int(id)),
+						_Utils_Tuple2(
+						'length',
+						$elm$json$Json$Encode$int(length))
+					])));
+	});
+var $author$project$Main$sendStoppedEvent = function (id) {
+	return $author$project$Main$toRecorder(
+		$elm$json$Json$Encode$object(
 			_List_fromArray(
 				[
 					_Utils_Tuple2(
 					'event',
-					$elm$json$Json$Encode$string(event)),
+					$elm$json$Json$Encode$string('stopped')),
 					_Utils_Tuple2(
 					'id',
 					$elm$json$Json$Encode$int(id))
-				]));
-	});
-var $author$project$Main$toRecorder = _Platform_outgoingPort('toRecorder', $elm$core$Basics$identity);
-var $author$project$Main$sendStartedEvent = function (id) {
-	return $author$project$Main$toRecorder(
-		A2($author$project$Main$eventObject, 'started', id));
-};
-var $author$project$Main$sendStoppedEvent = function (id) {
-	return $author$project$Main$toRecorder(
-		A2($author$project$Main$eventObject, 'stopped', id));
+				])));
 };
 var $author$project$Main$Tick = function (a) {
 	return {$: 'Tick', a: a};
@@ -5304,13 +5359,23 @@ var $elm$core$Basics$always = F2(
 		return a;
 	});
 var $elm$core$Process$sleep = _Process_sleep;
+var $author$project$Main$tickDelta = 1000;
 var $author$project$Main$tick = function (id) {
 	return A2(
 		$elm$core$Task$perform,
 		$elm$core$Basics$always(
 			$author$project$Main$Tick(id)),
-		$elm$core$Process$sleep(1000));
+		$elm$core$Process$sleep($author$project$Main$tickDelta));
 };
+var $elm$core$Maybe$withDefault = F2(
+	function (_default, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return value;
+		} else {
+			return _default;
+		}
+	});
 var $author$project$Main$update = F2(
 	function (msg, model) {
 		var status = model.status;
@@ -5325,10 +5390,10 @@ var $author$project$Main$update = F2(
 		var toStatus = function (input) {
 			var title = input.title;
 			var length = input.length;
-			var _v8 = _Utils_Tuple2(title, length);
-			if ((_v8.a.$ === 'Just') && (_v8.b.$ === 'Ok')) {
-				var t = _v8.a.a;
-				var l = _v8.b.a;
+			var _v11 = _Utils_Tuple2(title, length);
+			if ((_v11.a.$ === 'Just') && (_v11.b.$ === 'Ok')) {
+				var t = _v11.a.a;
+				var l = _v11.b.a;
 				return $author$project$Main$Initalized(
 					{length: l, title: t});
 			} else {
@@ -5354,7 +5419,7 @@ var $author$project$Main$update = F2(
 			};
 		};
 		var _v0 = _Utils_Tuple2(status, msg);
-		_v0$10:
+		_v0$11:
 		while (true) {
 			switch (_v0.a.$) {
 				case 'Configuring':
@@ -5390,7 +5455,7 @@ var $author$project$Main$update = F2(
 									}),
 								$elm$core$Platform$Cmd$none);
 						default:
-							break _v0$10;
+							break _v0$11;
 					}
 				case 'Initalized':
 					switch (_v0.b.$) {
@@ -5434,13 +5499,13 @@ var $author$project$Main$update = F2(
 								_Utils_update(
 									model,
 									{nextId: nextId + 1}),
-								$author$project$Main$sendStartedEvent(nextId));
+								A2($author$project$Main$sendStartedEvent, nextId, length));
 						case 'FromRecorder':
-							if ((_v0.b.a.$ === 'Just') && (_v0.b.a.a.$ === 'StartedEvent')) {
+							if ((_v0.b.a.$ === 'Ok') && (_v0.b.a.a.$ === 'StartedEvent')) {
 								var title = _v0.a.a.title;
 								var length = _v0.a.a.length;
 								var id = _v0.b.a.a.a;
-								var item = {id: id, length: length, title: title};
+								var item = {id: id, length: length, mime: $elm$core$Maybe$Nothing, size: $elm$core$Maybe$Nothing, title: title, url: $elm$core$Maybe$Nothing};
 								return _Utils_Tuple2(
 									_Utils_update(
 										model,
@@ -5452,10 +5517,10 @@ var $author$project$Main$update = F2(
 										}),
 									$author$project$Main$tick(item.id));
 							} else {
-								break _v0$10;
+								break _v0$11;
 							}
 						default:
-							break _v0$10;
+							break _v0$11;
 					}
 				case 'Recording':
 					switch (_v0.b.$) {
@@ -5471,32 +5536,74 @@ var $author$project$Main$update = F2(
 									}),
 								$author$project$Main$sendStoppedEvent(item.id));
 						case 'FromRecorder':
-							if ((_v0.b.a.$ === 'Just') && (_v0.b.a.a.$ === 'StoppedEvent')) {
-								var _v4 = _v0.a;
-								var item = _v4.a;
-								var id = _v0.b.a.a.a;
-								return _Utils_eq(item.id, id) ? _Utils_Tuple2(
-									_Utils_update(
-										model,
-										{
-											status: $author$project$Main$Success(item)
-										}),
-									$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+							if (_v0.b.a.$ === 'Ok') {
+								switch (_v0.b.a.a.$) {
+									case 'StoppedEvent':
+										var _v4 = _v0.a;
+										var item = _v4.a;
+										var _v5 = _v0.b.a.a;
+										var id = _v5.a;
+										var mime = _v5.b.mime;
+										var url = _v5.b.url;
+										if (_Utils_eq(item.id, id)) {
+											var updatedItem = _Utils_update(
+												item,
+												{
+													mime: $elm$core$Maybe$Just(mime),
+													url: $elm$core$Maybe$Just(url)
+												});
+											return _Utils_Tuple2(
+												_Utils_update(
+													model,
+													{
+														status: $author$project$Main$Success(updatedItem)
+													}),
+												$elm$core$Platform$Cmd$none);
+										} else {
+											return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+										}
+									case 'DataChunkEvent':
+										var _v6 = _v0.a;
+										var item = _v6.a;
+										var downc = _v6.b;
+										var _v7 = _v0.b.a.a;
+										var id = _v7.a;
+										var size = _v7.b.size;
+										if (_Utils_eq(item.id, id)) {
+											var updatedItem = _Utils_update(
+												item,
+												{
+													size: $elm$core$Maybe$Just(
+														A2($elm$core$Maybe$withDefault, 0, item.size) + size)
+												});
+											return _Utils_Tuple2(
+												_Utils_update(
+													model,
+													{
+														status: A2($author$project$Main$Recording, updatedItem, downc)
+													}),
+												$elm$core$Platform$Cmd$none);
+										} else {
+											return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+										}
+									default:
+										break _v0$11;
+								}
 							} else {
-								break _v0$10;
+								break _v0$11;
 							}
 						case 'Tick':
-							var _v5 = _v0.a;
-							var item = _v5.a;
-							var remaining = _v5.b.a;
+							var _v8 = _v0.a;
+							var item = _v8.a;
+							var remaining = _v8.b.a;
 							var id = _v0.b.a;
-							var _v6 = _Utils_Tuple2(
+							var _v9 = _Utils_Tuple2(
 								_Utils_eq(item.id, id),
 								remaining);
-							if (!_v6.a) {
+							if (!_v9.a) {
 								return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 							} else {
-								if (!_v6.b) {
+								if (!_v9.b) {
 									return _Utils_Tuple2(
 										_Utils_update(
 											model,
@@ -5521,20 +5628,22 @@ var $author$project$Main$update = F2(
 								}
 							}
 						default:
-							break _v0$10;
+							break _v0$11;
 					}
-				default:
+				case 'Success':
 					if (_v0.b.$ === 'NewClicked') {
 						var item = _v0.a.a;
-						var _v7 = _v0.b;
+						var _v10 = _v0.b;
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
 								{status: $author$project$Main$initialStatus}),
 							$elm$core$Platform$Cmd$none);
 					} else {
-						break _v0$10;
+						break _v0$11;
 					}
+				default:
+					break _v0$11;
 			}
 		}
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -5548,6 +5657,7 @@ var $author$project$Main$StopClicked = {$: 'StopClicked'};
 var $author$project$Main$TitleChanged = function (a) {
 	return {$: 'TitleChanged', a: a};
 };
+var $elm$html$Html$audio = _VirtualDom_node('audio');
 var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$json$Json$Encode$bool = _Json_wrap;
 var $elm$html$Html$Attributes$boolProperty = F2(
@@ -5557,6 +5667,7 @@ var $elm$html$Html$Attributes$boolProperty = F2(
 			key,
 			$elm$json$Json$Encode$bool(bool));
 	});
+var $elm$html$Html$Attributes$controls = $elm$html$Html$Attributes$boolProperty('controls');
 var $elm$html$Html$Attributes$disabled = $elm$html$Html$Attributes$boolProperty('disabled');
 var $elm$html$Html$div = _VirtualDom_node('div');
 var $elm$html$Html$Attributes$stringProperty = F2(
@@ -5621,6 +5732,12 @@ var $elm$html$Html$Events$onInput = function (tagger) {
 var $elm$html$Html$p = _VirtualDom_node('p');
 var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
 var $elm$html$Html$pre = _VirtualDom_node('pre');
+var $elm$html$Html$Attributes$src = function (url) {
+	return A2(
+		$elm$html$Html$Attributes$stringProperty,
+		'src',
+		_VirtualDom_noJavaScriptOrHtmlUri(url));
+};
 var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
 var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
@@ -5629,15 +5746,6 @@ var $elm$html$Html$Attributes$title = $elm$html$Html$Attributes$stringProperty('
 var $elm$core$Debug$toString = _Debug_toString;
 var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
-var $elm$core$Maybe$withDefault = F2(
-	function (_default, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return value;
-		} else {
-			return _default;
-		}
-	});
 var $author$project$Main$view = function (model) {
 	var status = model.status;
 	var buttonView = function () {
@@ -5669,16 +5777,32 @@ var $author$project$Main$view = function (model) {
 						]));
 			case 'Recording':
 				var item = status.a;
+				var n = status.b.a;
+				var s = 'Stop (' + ($elm$core$String$fromInt(n) + ')');
 				return A2(
 					$elm$html$Html$button,
 					_List_fromArray(
 						[
 							$elm$html$Html$Events$onClick($author$project$Main$StopClicked),
-							$elm$html$Html$Attributes$title('Stop')
+							$elm$html$Html$Attributes$title(s)
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Stop')
+							$elm$html$Html$text(s)
+						]));
+			case 'WentWrong':
+				var item = status.a;
+				var err = status.b;
+				return A2(
+					$elm$html$Html$button,
+					_List_fromArray(
+						[
+							$elm$html$Html$Events$onClick($author$project$Main$NewClicked),
+							$elm$html$Html$Attributes$title('New')
+						]),
+					_List_fromArray(
+						[
+							$elm$html$Html$text('New')
 						]));
 			default:
 				var item = status.a;
@@ -5693,6 +5817,36 @@ var $author$project$Main$view = function (model) {
 						[
 							$elm$html$Html$text('New')
 						]));
+		}
+	}();
+	var audioView = function () {
+		if (status.$ === 'Success') {
+			var url = status.a.url;
+			var mime = status.a.mime;
+			var _v4 = _Utils_Tuple2(url, mime);
+			if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
+				var source = _v4.a.a;
+				var mtype = _v4.b.a;
+				return A2(
+					$elm$html$Html$div,
+					_List_Nil,
+					_List_fromArray(
+						[
+							A2(
+							$elm$html$Html$audio,
+							_List_fromArray(
+								[
+									$elm$html$Html$Attributes$src(source),
+									$elm$html$Html$Attributes$type_(mtype),
+									$elm$html$Html$Attributes$controls(true)
+								]),
+							_List_Nil)
+						]));
+			} else {
+				return $elm$html$Html$text('');
+			}
+		} else {
+			return $elm$html$Html$text('');
 		}
 	}();
 	var _v0 = function () {
@@ -5720,16 +5874,26 @@ var $author$project$Main$view = function (model) {
 					$elm$core$String$fromInt(length),
 					false);
 			case 'Recording':
-				var item = status.a;
+				var title = status.a.title;
+				var length = status.a.length;
 				return _Utils_Tuple3(
-					item.title,
-					$elm$core$String$fromInt(item.length),
+					title,
+					$elm$core$String$fromInt(length),
+					true);
+			case 'Success':
+				var title = status.a.title;
+				var length = status.a.length;
+				return _Utils_Tuple3(
+					title,
+					$elm$core$String$fromInt(length),
 					true);
 			default:
-				var item = status.a;
+				var title = status.a.title;
+				var length = status.a.length;
+				var err = status.b;
 				return _Utils_Tuple3(
-					item.title,
-					$elm$core$String$fromInt(item.length),
+					title,
+					$elm$core$String$fromInt(length),
 					true);
 		}
 	}();
@@ -5799,6 +5963,7 @@ var $author$project$Main$view = function (model) {
 						_List_Nil)
 					])),
 				buttonView,
+				audioView,
 				A2(
 				$elm$html$Html$pre,
 				_List_Nil,

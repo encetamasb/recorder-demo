@@ -13,29 +13,57 @@
             flags: {}
         });
 
-        var recorder, curStream;
-        var chunks = [];
-
         var chunkDelta = 1000;
+
+        var recorder, curStream, curId;
+        var chunks = [];
 
         app.ports.toRecorder.subscribe(function(msg) {
             switch (msg.event) {
+                case "reseted":
+                    if (recorder) {
+                        recorder.stop()
+
+                        curStream.getAudioTracks().forEach(function(track){
+                            track.stop();
+                        });
+                    }
+
+                    curId = null;
+                    chunks = [];
+
+                    app.ports.fromRecorder.send({
+                        event: "reseted",
+                        id: -1
+                    });
+
+                    break;
                 case "started":
+                    if (recorder) {
+                        recorder.stop();
+
+                        curStream.getAudioTracks().forEach(function(track){
+                            track.stop();
+                        });
+                    }
+                    curId = msg.id;
                     navigator.mediaDevices.getUserMedia({
                         audio: true,
                         video: false
                     }).then(function(stream) {
                         chunks = [];
-
                         curStream = stream;
                         recorder = new MediaRecorder(stream);
 
                         recorder.ondataavailable = function(e) {
+                            if (curId == null) {
+                                return;
+                            }
                             chunks.push(e.data);
                             e.data.arrayBuffer().then(function(buffer) {
                                 app.ports.fromRecorder.send({
                                     event: "datachunk",
-                                    id: msg.id,
+                                    id: curId,
                                     size: buffer.byteLength
                                 });
                             });
@@ -45,7 +73,7 @@
 
                         app.ports.fromRecorder.send({
                             event: "started",
-                            id: msg.id,
+                            id: curId,
                         });
                     })
 
@@ -57,20 +85,26 @@
                         track.stop();
                     });
 
-                    var blob = chunks.reduce(function(a, b) {
-                        return new Blob([a, b], {type: a.type})
-                    });
+                    var blob;
 
-                    var url = URL.createObjectURL(blob);
-
-                    console.log(blob, url);
-
-                    app.ports.fromRecorder.send({
-                        event: "stopped",
-                        id: msg.id,
-                        url: url,
-                        mime: blob.type
-                    });
+                    if (chunks && chunks.length > 0) {
+                        blob = chunks.reduce(function(a, b) {
+                            return new Blob([a, b], {type: a.type})
+                        });
+                        var url = URL.createObjectURL(blob);
+                        console.log(blob, url);
+                        app.ports.fromRecorder.send({
+                            event: "stopped",
+                            id: msg.id,
+                            url: url,
+                            mime: blob.type
+                        });
+                    } else {
+                        app.ports.fromRecorder.send({
+                            event: "stopped",
+                            id: msg.id,
+                        });
+                    }
                     break;
                 default:
                     console.log("ops", msg);

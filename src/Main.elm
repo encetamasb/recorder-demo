@@ -3,8 +3,8 @@ port module Main exposing (main)
 import Array exposing (Array)
 import Browser
 import Debug
-import Html exposing (Html, audio, button, div, input, label, p, pre, text)
-import Html.Attributes exposing (controls, disabled, for, name, placeholder, src, style, title, type_, value, width)
+import Html exposing (Html, a, audio, button, div, input, label, p, pre, text)
+import Html.Attributes exposing (controls, disabled, download, for, href, name, placeholder, src, style, title, type_, value, width)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -78,7 +78,8 @@ type alias Model =
 
 type RecorderEvent
     = StartedEvent ID
-    | StoppedEvent ID { url : String, mime : String }
+    | StoppedEvent ID (Maybe { url : String, mime : String })
+    | ResetedEvent
     | DataChunkEvent ID { size : Int }
 
 
@@ -88,7 +89,7 @@ type Msg
     | RecordClicked
     | StopClicked
     | Tick ID
-    | NewClicked
+    | ResetClicked
     | FromRecorder (Result String RecorderEvent)
 
 
@@ -100,11 +101,16 @@ initialStatus =
         }
 
 
+initialModel : Model
+initialModel =
+    { nextId = 0
+    , status = initialStatus
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init flags =
-    ( { nextId = 0
-      , status = initialStatus
-      }
+    ( initialModel
     , Cmd.none
     )
 
@@ -175,16 +181,23 @@ update msg ({ status, nextId } as model) =
             , tick item.id
             )
 
-        ( Recording item _, StopClicked ) ->
-            ( { model | status = Success item }, sendStoppedEvent item.id )
+        ( Recording item dc, StopClicked ) ->
+            ( model, sendStoppedEvent item.id )
 
-        ( Recording item _, FromRecorder (Ok (StoppedEvent id { mime, url })) ) ->
+        ( Recording item _, FromRecorder (Ok (StoppedEvent id (Just { mime, url }))) ) ->
             if item.id == id then
                 let
                     updatedItem =
                         { item | mime = Just mime, url = Just url }
                 in
                 ( { model | status = Success updatedItem }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+        ( Recording item _, FromRecorder (Ok (StoppedEvent id Nothing)) ) ->
+            if item.id == id then
+                ( { model | status = WentWrong item "No recording data" }, Cmd.none )
 
             else
                 ( model, Cmd.none )
@@ -200,6 +213,13 @@ update msg ({ status, nextId } as model) =
             else
                 ( model, Cmd.none )
 
+        ( _, FromRecorder (Ok ResetedEvent) ) ->
+            let
+                new =
+                    initialModel
+            in
+            ( { new | nextId = model.nextId }, Cmd.none )
+
         ( Recording item (DownCounter remaining), Tick id ) ->
             case ( item.id == id, remaining ) of
                 ( False, _ ) ->
@@ -211,10 +231,14 @@ update msg ({ status, nextId } as model) =
                 _ ->
                     ( { model | status = Recording item (DownCounter <| remaining - 1) }, tick item.id )
 
-        ( Success item, NewClicked ) ->
-            ( { model | status = initialStatus }, Cmd.none )
+        ( _, ResetClicked ) ->
+            ( model, sendResetedEvent )
 
-        ( _, _ ) ->
+        ( st, event ) ->
+            let
+                _ =
+                    Debug.log "unhandled msg" ( st, event )
+            in
             ( model, Cmd.none )
 
 
@@ -246,39 +270,69 @@ view ({ status } as model) =
                 WentWrong { title, length } err ->
                     ( title, String.fromInt length, True )
 
-        buttonView =
+        buttonView t msg isDisabled =
+            case isDisabled of
+                True ->
+                    button [ disabled True, title t ] [ text t ]
+
+                False ->
+                    button [ onClick msg, title t ] [ text t ]
+
+        buttonsView =
+            let
+                recBtn isDisabled =
+                    buttonView "Record" RecordClicked isDisabled
+
+                stopBtn s isDisabled =
+                    buttonView s StopClicked isDisabled
+
+                resetBtn isDisabled =
+                    buttonView "Reset" ResetClicked isDisabled
+            in
             case status of
                 Configuring _ ->
-                    button [ disabled True, title "Record" ] [ text "Record" ]
+                    div []
+                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
 
                 Initalized s ->
-                    button [ onClick RecordClicked, title "Record" ] [ text "Record" ]
+                    div []
+                        [ recBtn False, stopBtn "Stop" True, resetBtn False ]
 
                 Recording item (DownCounter n) ->
                     let
                         s =
                             "Stop (" ++ String.fromInt n ++ ")"
                     in
-                    button [ onClick StopClicked, title s ] [ text s ]
+                    div []
+                        [ recBtn True, stopBtn s False, resetBtn False ]
 
                 WentWrong item err ->
-                    button [ onClick NewClicked, title "New" ] [ text "New" ]
+                    div []
+                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
 
                 Success item ->
-                    button [ onClick NewClicked, title "New" ] [ text "New" ]
+                    div []
+                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
 
         audioView =
             case status of
                 Success { url, mime } ->
                     case ( url, mime ) of
                         ( Just source, Just mtype ) ->
-                            div []
+                            let
+                                ext =
+                                    Maybe.withDefault "bin" (mimeToExtension mtype)
+                            in
+                            p []
                                 [ audio
                                     [ src source
                                     , type_ mtype
                                     , controls True
                                     ]
                                     []
+                                , p []
+                                    [ a [ href source, download (recTitle ++ "." ++ ext) ] [ text "Download" ]
+                                    ]
                                 ]
 
                         _ ->
@@ -312,12 +366,30 @@ view ({ status } as model) =
                 ]
                 []
             ]
-        , buttonView
+        , buttonsView
         , audioView
         , pre
             []
             [ text << Debug.toString <| model.status ]
         ]
+
+
+mimeToExtension : String -> Maybe String
+mimeToExtension mime =
+    let
+        match ( s, ext ) =
+            String.startsWith s mime
+
+        possible =
+            [ ( "audio/webm", "webm" )
+            , ( "audio/ogg", "ogg" )
+            , ( "audio/vorbis", "ogg" )
+            , ( "audio/mp4", "mp4" )
+            , ( "audio/m4a", "m4a" )
+            , ( "audio/mpeg", "mp3" )
+            ]
+    in
+    Debug.log "ext" (possible |> List.filter match) |> List.head |> Maybe.map (\( _, snd ) -> snd)
 
 
 tick : ID -> Cmd Msg
@@ -339,6 +411,13 @@ sendStoppedEvent id =
         Encode.object
             [ ( "event", Encode.string "stopped" )
             , ( "id", Encode.int id )
+            ]
+
+
+sendResetedEvent =
+    toRecorder <|
+        Encode.object
+            [ ( "event", Encode.string "reseted" )
             ]
 
 
@@ -370,10 +449,10 @@ mapToRecorderEvent json =
                 "stopped" ->
                     case ( maybeMime, maybeUrl ) of
                         ( Just mime, Just url ) ->
-                            Ok (StoppedEvent id { url = url, mime = mime })
+                            Ok (StoppedEvent id (Just { url = url, mime = mime }))
 
                         _ ->
-                            Err "Missing data url or mime"
+                            Ok (StoppedEvent id Nothing)
 
                 "datachunk" ->
                     case maybeSize of
@@ -382,6 +461,9 @@ mapToRecorderEvent json =
 
                         Nothing ->
                             Err "Missing data size"
+
+                "reseted" ->
+                    Ok ResetedEvent
 
                 m ->
                     Err <| "Unknown message (" ++ m ++ ")"

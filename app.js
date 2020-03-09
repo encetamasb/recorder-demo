@@ -5153,12 +5153,11 @@ var $author$project$Main$initialStatus = $author$project$Main$Configuring(
 		length: $elm$core$Result$Ok($author$project$Main$defaultSecs),
 		title: $elm$core$Maybe$Nothing
 	});
+var $author$project$Main$initialModel = {nextId: 0, status: $author$project$Main$initialStatus};
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $author$project$Main$init = function (flags) {
-	return _Utils_Tuple2(
-		{nextId: 0, status: $author$project$Main$initialStatus},
-		$elm$core$Platform$Cmd$none);
+	return _Utils_Tuple2($author$project$Main$initialModel, $elm$core$Platform$Cmd$none);
 };
 var $author$project$Main$FromRecorder = function (a) {
 	return {$: 'FromRecorder', a: a};
@@ -5175,6 +5174,7 @@ var $author$project$Main$DataChunkEvent = F2(
 	function (a, b) {
 		return {$: 'DataChunkEvent', a: a, b: b};
 	});
+var $author$project$Main$ResetedEvent = {$: 'ResetedEvent'};
 var $author$project$Main$StartedEvent = function (a) {
 	return {$: 'StartedEvent', a: a};
 };
@@ -5235,9 +5235,11 @@ var $author$project$Main$mapToRecorderEvent = function (json) {
 						A2(
 							$author$project$Main$StoppedEvent,
 							id,
-							{mime: mime, url: url}));
+							$elm$core$Maybe$Just(
+								{mime: mime, url: url})));
 				} else {
-					return $elm$core$Result$Err('Missing data url or mime');
+					return $elm$core$Result$Ok(
+						A2($author$project$Main$StoppedEvent, id, $elm$core$Maybe$Nothing));
 				}
 			case 'datachunk':
 				if (maybeSize.$ === 'Just') {
@@ -5250,6 +5252,8 @@ var $author$project$Main$mapToRecorderEvent = function (json) {
 				} else {
 					return $elm$core$Result$Err('Missing data size');
 				}
+			case 'reseted':
+				return $elm$core$Result$Ok($author$project$Main$ResetedEvent);
 			default:
 				var m = event;
 				return $elm$core$Result$Err('Unknown message (' + (m + ')'));
@@ -5280,6 +5284,10 @@ var $author$project$Main$Recording = F2(
 var $author$project$Main$Success = function (a) {
 	return {$: 'Success', a: a};
 };
+var $author$project$Main$WentWrong = F2(
+	function (a, b) {
+		return {$: 'WentWrong', a: a, b: b};
+	});
 var $elm$core$Result$fromMaybe = F2(
 	function (err, maybe) {
 		if (maybe.$ === 'Just') {
@@ -5305,7 +5313,6 @@ var $elm$core$Basics$min = F2(
 		return (_Utils_cmp(x, y) < 0) ? x : y;
 	});
 var $author$project$Main$minSecs = 1;
-var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$object = function (pairs) {
 	return _Json_wrap(
 		A3(
@@ -5321,6 +5328,15 @@ var $elm$json$Json$Encode$object = function (pairs) {
 };
 var $elm$json$Json$Encode$string = _Json_wrap;
 var $author$project$Main$toRecorder = _Platform_outgoingPort('toRecorder', $elm$core$Basics$identity);
+var $author$project$Main$sendResetedEvent = $author$project$Main$toRecorder(
+	$elm$json$Json$Encode$object(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				'event',
+				$elm$json$Json$Encode$string('reseted'))
+			])));
+var $elm$json$Json$Encode$int = _Json_wrap;
 var $author$project$Main$sendStartedEvent = F2(
 	function (id, length) {
 		return $author$project$Main$toRecorder(
@@ -5390,10 +5406,10 @@ var $author$project$Main$update = F2(
 		var toStatus = function (input) {
 			var title = input.title;
 			var length = input.length;
-			var _v11 = _Utils_Tuple2(title, length);
-			if ((_v11.a.$ === 'Just') && (_v11.b.$ === 'Ok')) {
-				var t = _v11.a.a;
-				var l = _v11.b.a;
+			var _v16 = _Utils_Tuple2(title, length);
+			if ((_v16.a.$ === 'Just') && (_v16.b.$ === 'Ok')) {
+				var t = _v16.a.a;
+				var l = _v16.b.a;
 				return $author$project$Main$Initalized(
 					{length: l, title: t});
 			} else {
@@ -5419,12 +5435,12 @@ var $author$project$Main$update = F2(
 			};
 		};
 		var _v0 = _Utils_Tuple2(status, msg);
-		_v0$11:
+		_v0$13:
 		while (true) {
-			switch (_v0.a.$) {
-				case 'Configuring':
-					switch (_v0.b.$) {
-						case 'TitleChanged':
+			switch (_v0.b.$) {
+				case 'TitleChanged':
+					switch (_v0.a.$) {
+						case 'Configuring':
 							var input = _v0.a.a;
 							var s = _v0.b.a;
 							return _Utils_Tuple2(
@@ -5439,27 +5455,7 @@ var $author$project$Main$update = F2(
 												}))
 									}),
 								$elm$core$Platform$Cmd$none);
-						case 'LengthChanged':
-							var input = _v0.a.a;
-							var s = _v0.b.a;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										status: toStatus(
-											_Utils_update(
-												input,
-												{
-													length: toLength(s)
-												}))
-									}),
-								$elm$core$Platform$Cmd$none);
-						default:
-							break _v0$11;
-					}
-				case 'Initalized':
-					switch (_v0.b.$) {
-						case 'TitleChanged':
+						case 'Initalized':
 							var valid = _v0.a.a;
 							var s = _v0.b.a;
 							var input = toInput(valid);
@@ -5475,7 +5471,27 @@ var $author$project$Main$update = F2(
 												}))
 									}),
 								$elm$core$Platform$Cmd$none);
-						case 'LengthChanged':
+						default:
+							break _v0$13;
+					}
+				case 'LengthChanged':
+					switch (_v0.a.$) {
+						case 'Configuring':
+							var input = _v0.a.a;
+							var s = _v0.b.a;
+							return _Utils_Tuple2(
+								_Utils_update(
+									model,
+									{
+										status: toStatus(
+											_Utils_update(
+												input,
+												{
+													length: toLength(s)
+												}))
+									}),
+								$elm$core$Platform$Cmd$none);
+						case 'Initalized':
 							var valid = _v0.a.a;
 							var s = _v0.b.a;
 							var input = toInput(valid);
@@ -5491,60 +5507,65 @@ var $author$project$Main$update = F2(
 												}))
 									}),
 								$elm$core$Platform$Cmd$none);
-						case 'RecordClicked':
-							var title = _v0.a.a.title;
-							var length = _v0.a.a.length;
-							var _v1 = _v0.b;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{nextId: nextId + 1}),
-								A2($author$project$Main$sendStartedEvent, nextId, length));
-						case 'FromRecorder':
-							if ((_v0.b.a.$ === 'Ok') && (_v0.b.a.a.$ === 'StartedEvent')) {
-								var title = _v0.a.a.title;
-								var length = _v0.a.a.length;
-								var id = _v0.b.a.a.a;
-								var item = {id: id, length: length, mime: $elm$core$Maybe$Nothing, size: $elm$core$Maybe$Nothing, title: title, url: $elm$core$Maybe$Nothing};
-								return _Utils_Tuple2(
-									_Utils_update(
-										model,
-										{
-											status: A2(
-												$author$project$Main$Recording,
-												item,
-												$author$project$Main$DownCounter(length))
-										}),
-									$author$project$Main$tick(item.id));
-							} else {
-								break _v0$11;
-							}
 						default:
-							break _v0$11;
+							break _v0$13;
 					}
-				case 'Recording':
-					switch (_v0.b.$) {
-						case 'StopClicked':
-							var _v2 = _v0.a;
-							var item = _v2.a;
-							var _v3 = _v0.b;
-							return _Utils_Tuple2(
-								_Utils_update(
-									model,
-									{
-										status: $author$project$Main$Success(item)
-									}),
-								$author$project$Main$sendStoppedEvent(item.id));
-						case 'FromRecorder':
-							if (_v0.b.a.$ === 'Ok') {
-								switch (_v0.b.a.a.$) {
-									case 'StoppedEvent':
+				case 'RecordClicked':
+					if (_v0.a.$ === 'Initalized') {
+						var title = _v0.a.a.title;
+						var length = _v0.a.a.length;
+						var _v1 = _v0.b;
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{nextId: nextId + 1}),
+							A2($author$project$Main$sendStartedEvent, nextId, length));
+					} else {
+						break _v0$13;
+					}
+				case 'StopClicked':
+					if (_v0.a.$ === 'Recording') {
+						var _v2 = _v0.a;
+						var item = _v2.a;
+						var dc = _v2.b;
+						var _v3 = _v0.b;
+						return _Utils_Tuple2(
+							model,
+							$author$project$Main$sendStoppedEvent(item.id));
+					} else {
+						break _v0$13;
+					}
+				case 'FromRecorder':
+					if (_v0.b.a.$ === 'Ok') {
+						switch (_v0.b.a.a.$) {
+							case 'StartedEvent':
+								if (_v0.a.$ === 'Initalized') {
+									var title = _v0.a.a.title;
+									var length = _v0.a.a.length;
+									var id = _v0.b.a.a.a;
+									var item = {id: id, length: length, mime: $elm$core$Maybe$Nothing, size: $elm$core$Maybe$Nothing, title: title, url: $elm$core$Maybe$Nothing};
+									return _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{
+												status: A2(
+													$author$project$Main$Recording,
+													item,
+													$author$project$Main$DownCounter(length))
+											}),
+										$author$project$Main$tick(item.id));
+								} else {
+									break _v0$13;
+								}
+							case 'StoppedEvent':
+								if (_v0.a.$ === 'Recording') {
+									if (_v0.b.a.a.b.$ === 'Just') {
 										var _v4 = _v0.a;
 										var item = _v4.a;
 										var _v5 = _v0.b.a.a;
 										var id = _v5.a;
-										var mime = _v5.b.mime;
-										var url = _v5.b.url;
+										var mime = _v5.b.a.mime;
+										var url = _v5.b.a.url;
 										if (_Utils_eq(item.id, id)) {
 											var updatedItem = _Utils_update(
 												item,
@@ -5562,101 +5583,125 @@ var $author$project$Main$update = F2(
 										} else {
 											return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 										}
-									case 'DataChunkEvent':
+									} else {
 										var _v6 = _v0.a;
 										var item = _v6.a;
-										var downc = _v6.b;
 										var _v7 = _v0.b.a.a;
 										var id = _v7.a;
-										var size = _v7.b.size;
-										if (_Utils_eq(item.id, id)) {
-											var updatedItem = _Utils_update(
-												item,
+										var _v8 = _v7.b;
+										return _Utils_eq(item.id, id) ? _Utils_Tuple2(
+											_Utils_update(
+												model,
 												{
-													size: $elm$core$Maybe$Just(
-														A2($elm$core$Maybe$withDefault, 0, item.size) + size)
-												});
-											return _Utils_Tuple2(
-												_Utils_update(
-													model,
-													{
-														status: A2($author$project$Main$Recording, updatedItem, downc)
-													}),
-												$elm$core$Platform$Cmd$none);
-										} else {
-											return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-										}
-									default:
-										break _v0$11;
-								}
-							} else {
-								break _v0$11;
-							}
-						case 'Tick':
-							var _v8 = _v0.a;
-							var item = _v8.a;
-							var remaining = _v8.b.a;
-							var id = _v0.b.a;
-							var _v9 = _Utils_Tuple2(
-								_Utils_eq(item.id, id),
-								remaining);
-							if (!_v9.a) {
-								return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-							} else {
-								if (!_v9.b) {
-									return _Utils_Tuple2(
-										_Utils_update(
-											model,
-											{
-												status: A2(
-													$author$project$Main$Recording,
-													item,
-													$author$project$Main$DownCounter(0))
-											}),
-										$author$project$Main$sendStoppedEvent(id));
+													status: A2($author$project$Main$WentWrong, item, 'No recording data')
+												}),
+											$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+									}
 								} else {
-									return _Utils_Tuple2(
-										_Utils_update(
-											model,
-											{
-												status: A2(
-													$author$project$Main$Recording,
-													item,
-													$author$project$Main$DownCounter(remaining - 1))
-											}),
-										$author$project$Main$tick(item.id));
+									break _v0$13;
 								}
-							}
-						default:
-							break _v0$11;
-					}
-				case 'Success':
-					if (_v0.b.$ === 'NewClicked') {
-						var item = _v0.a.a;
-						var _v10 = _v0.b;
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{status: $author$project$Main$initialStatus}),
-							$elm$core$Platform$Cmd$none);
+							case 'DataChunkEvent':
+								if (_v0.a.$ === 'Recording') {
+									var _v9 = _v0.a;
+									var item = _v9.a;
+									var downc = _v9.b;
+									var _v10 = _v0.b.a.a;
+									var id = _v10.a;
+									var size = _v10.b.size;
+									if (_Utils_eq(item.id, id)) {
+										var updatedItem = _Utils_update(
+											item,
+											{
+												size: $elm$core$Maybe$Just(
+													A2($elm$core$Maybe$withDefault, 0, item.size) + size)
+											});
+										return _Utils_Tuple2(
+											_Utils_update(
+												model,
+												{
+													status: A2($author$project$Main$Recording, updatedItem, downc)
+												}),
+											$elm$core$Platform$Cmd$none);
+									} else {
+										return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+									}
+								} else {
+									break _v0$13;
+								}
+							default:
+								var _v11 = _v0.b.a.a;
+								var _new = $author$project$Main$initialModel;
+								return _Utils_Tuple2(
+									_Utils_update(
+										_new,
+										{nextId: model.nextId}),
+									$elm$core$Platform$Cmd$none);
+						}
 					} else {
-						break _v0$11;
+						break _v0$13;
+					}
+				case 'Tick':
+					if (_v0.a.$ === 'Recording') {
+						var _v12 = _v0.a;
+						var item = _v12.a;
+						var remaining = _v12.b.a;
+						var id = _v0.b.a;
+						var _v13 = _Utils_Tuple2(
+							_Utils_eq(item.id, id),
+							remaining);
+						if (!_v13.a) {
+							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+						} else {
+							if (!_v13.b) {
+								return _Utils_Tuple2(
+									_Utils_update(
+										model,
+										{
+											status: A2(
+												$author$project$Main$Recording,
+												item,
+												$author$project$Main$DownCounter(0))
+										}),
+									$author$project$Main$sendStoppedEvent(id));
+							} else {
+								return _Utils_Tuple2(
+									_Utils_update(
+										model,
+										{
+											status: A2(
+												$author$project$Main$Recording,
+												item,
+												$author$project$Main$DownCounter(remaining - 1))
+										}),
+									$author$project$Main$tick(item.id));
+							}
+						}
+					} else {
+						break _v0$13;
 					}
 				default:
-					break _v0$11;
+					var _v14 = _v0.b;
+					return _Utils_Tuple2(model, $author$project$Main$sendResetedEvent);
 			}
 		}
+		var st = _v0.a;
+		var event = _v0.b;
+		var _v15 = A2(
+			$elm$core$Debug$log,
+			'unhandled msg',
+			_Utils_Tuple2(st, event));
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
 var $author$project$Main$LengthChanged = function (a) {
 	return {$: 'LengthChanged', a: a};
 };
-var $author$project$Main$NewClicked = {$: 'NewClicked'};
 var $author$project$Main$RecordClicked = {$: 'RecordClicked'};
+var $author$project$Main$ResetClicked = {$: 'ResetClicked'};
 var $author$project$Main$StopClicked = {$: 'StopClicked'};
 var $author$project$Main$TitleChanged = function (a) {
 	return {$: 'TitleChanged', a: a};
 };
+var $elm$html$Html$a = _VirtualDom_node('a');
 var $elm$html$Html$audio = _VirtualDom_node('audio');
 var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$json$Json$Encode$bool = _Json_wrap;
@@ -5677,9 +5722,65 @@ var $elm$html$Html$Attributes$stringProperty = F2(
 			key,
 			$elm$json$Json$Encode$string(string));
 	});
+var $elm$html$Html$Attributes$download = function (fileName) {
+	return A2($elm$html$Html$Attributes$stringProperty, 'download', fileName);
+};
 var $elm$html$Html$Attributes$for = $elm$html$Html$Attributes$stringProperty('htmlFor');
+var $elm$html$Html$Attributes$href = function (url) {
+	return A2(
+		$elm$html$Html$Attributes$stringProperty,
+		'href',
+		_VirtualDom_noJavaScriptUri(url));
+};
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$html$Html$label = _VirtualDom_node('label');
+var $elm$core$List$filter = F2(
+	function (isGood, list) {
+		return A3(
+			$elm$core$List$foldr,
+			F2(
+				function (x, xs) {
+					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
+				}),
+			_List_Nil,
+			list);
+	});
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $author$project$Main$mimeToExtension = function (mime) {
+	var possible = _List_fromArray(
+		[
+			_Utils_Tuple2('audio/webm', 'webm'),
+			_Utils_Tuple2('audio/ogg', 'ogg'),
+			_Utils_Tuple2('audio/vorbis', 'ogg'),
+			_Utils_Tuple2('audio/mp4', 'mp4'),
+			_Utils_Tuple2('audio/m4a', 'm4a'),
+			_Utils_Tuple2('audio/mpeg', 'mp3')
+		]);
+	var match = function (_v1) {
+		var s = _v1.a;
+		var ext = _v1.b;
+		return A2($elm$core$String$startsWith, s, mime);
+	};
+	return A2(
+		$elm$core$Maybe$map,
+		function (_v0) {
+			var snd = _v0.b;
+			return snd;
+		},
+		$elm$core$List$head(
+			A2(
+				$elm$core$Debug$log,
+				'ext',
+				A2($elm$core$List$filter, match, possible))));
+};
 var $elm$html$Html$Attributes$name = $elm$html$Html$Attributes$stringProperty('name');
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
@@ -5748,105 +5849,103 @@ var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
 var $author$project$Main$view = function (model) {
 	var status = model.status;
-	var buttonView = function () {
-		switch (status.$) {
-			case 'Configuring':
+	var buttonView = F3(
+		function (t, msg, isDisabled) {
+			if (isDisabled) {
 				return A2(
 					$elm$html$Html$button,
 					_List_fromArray(
 						[
 							$elm$html$Html$Attributes$disabled(true),
-							$elm$html$Html$Attributes$title('Record')
+							$elm$html$Html$Attributes$title(t)
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Record')
+							$elm$html$Html$text(t)
 						]));
-			case 'Initalized':
-				var s = status.a;
+			} else {
 				return A2(
 					$elm$html$Html$button,
 					_List_fromArray(
 						[
-							$elm$html$Html$Events$onClick($author$project$Main$RecordClicked),
-							$elm$html$Html$Attributes$title('Record')
+							$elm$html$Html$Events$onClick(msg),
+							$elm$html$Html$Attributes$title(t)
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Record')
+							$elm$html$Html$text(t)
+						]));
+			}
+		});
+	var buttonsView = function () {
+		var stopBtn = F2(
+			function (s, isDisabled) {
+				return A3(buttonView, s, $author$project$Main$StopClicked, isDisabled);
+			});
+		var resetBtn = function (isDisabled) {
+			return A3(buttonView, 'Reset', $author$project$Main$ResetClicked, isDisabled);
+		};
+		var recBtn = function (isDisabled) {
+			return A3(buttonView, 'Record', $author$project$Main$RecordClicked, isDisabled);
+		};
+		switch (status.$) {
+			case 'Configuring':
+				return A2(
+					$elm$html$Html$div,
+					_List_Nil,
+					_List_fromArray(
+						[
+							recBtn(true),
+							A2(stopBtn, 'Stop', true),
+							resetBtn(false)
+						]));
+			case 'Initalized':
+				var s = status.a;
+				return A2(
+					$elm$html$Html$div,
+					_List_Nil,
+					_List_fromArray(
+						[
+							recBtn(false),
+							A2(stopBtn, 'Stop', true),
+							resetBtn(false)
 						]));
 			case 'Recording':
 				var item = status.a;
 				var n = status.b.a;
 				var s = 'Stop (' + ($elm$core$String$fromInt(n) + ')');
 				return A2(
-					$elm$html$Html$button,
+					$elm$html$Html$div,
+					_List_Nil,
 					_List_fromArray(
 						[
-							$elm$html$Html$Events$onClick($author$project$Main$StopClicked),
-							$elm$html$Html$Attributes$title(s)
-						]),
-					_List_fromArray(
-						[
-							$elm$html$Html$text(s)
+							recBtn(true),
+							A2(stopBtn, s, false),
+							resetBtn(false)
 						]));
 			case 'WentWrong':
 				var item = status.a;
 				var err = status.b;
 				return A2(
-					$elm$html$Html$button,
+					$elm$html$Html$div,
+					_List_Nil,
 					_List_fromArray(
 						[
-							$elm$html$Html$Events$onClick($author$project$Main$NewClicked),
-							$elm$html$Html$Attributes$title('New')
-						]),
-					_List_fromArray(
-						[
-							$elm$html$Html$text('New')
+							recBtn(true),
+							A2(stopBtn, 'Stop', true),
+							resetBtn(false)
 						]));
 			default:
 				var item = status.a;
-				return A2(
-					$elm$html$Html$button,
-					_List_fromArray(
-						[
-							$elm$html$Html$Events$onClick($author$project$Main$NewClicked),
-							$elm$html$Html$Attributes$title('New')
-						]),
-					_List_fromArray(
-						[
-							$elm$html$Html$text('New')
-						]));
-		}
-	}();
-	var audioView = function () {
-		if (status.$ === 'Success') {
-			var url = status.a.url;
-			var mime = status.a.mime;
-			var _v4 = _Utils_Tuple2(url, mime);
-			if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
-				var source = _v4.a.a;
-				var mtype = _v4.b.a;
 				return A2(
 					$elm$html$Html$div,
 					_List_Nil,
 					_List_fromArray(
 						[
-							A2(
-							$elm$html$Html$audio,
-							_List_fromArray(
-								[
-									$elm$html$Html$Attributes$src(source),
-									$elm$html$Html$Attributes$type_(mtype),
-									$elm$html$Html$Attributes$controls(true)
-								]),
-							_List_Nil)
+							recBtn(true),
+							A2(stopBtn, 'Stop', true),
+							resetBtn(false)
 						]));
-			} else {
-				return $elm$html$Html$text('');
-			}
-		} else {
-			return $elm$html$Html$text('');
 		}
 	}();
 	var _v0 = function () {
@@ -5900,6 +5999,57 @@ var $author$project$Main$view = function (model) {
 	var recTitle = _v0.a;
 	var recLength = _v0.b;
 	var inputsDisabled = _v0.c;
+	var audioView = function () {
+		if (status.$ === 'Success') {
+			var url = status.a.url;
+			var mime = status.a.mime;
+			var _v4 = _Utils_Tuple2(url, mime);
+			if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
+				var source = _v4.a.a;
+				var mtype = _v4.b.a;
+				var ext = A2(
+					$elm$core$Maybe$withDefault,
+					'bin',
+					$author$project$Main$mimeToExtension(mtype));
+				return A2(
+					$elm$html$Html$p,
+					_List_Nil,
+					_List_fromArray(
+						[
+							A2(
+							$elm$html$Html$audio,
+							_List_fromArray(
+								[
+									$elm$html$Html$Attributes$src(source),
+									$elm$html$Html$Attributes$type_(mtype),
+									$elm$html$Html$Attributes$controls(true)
+								]),
+							_List_Nil),
+							A2(
+							$elm$html$Html$p,
+							_List_Nil,
+							_List_fromArray(
+								[
+									A2(
+									$elm$html$Html$a,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$href(source),
+											$elm$html$Html$Attributes$download(recTitle + ('.' + ext))
+										]),
+									_List_fromArray(
+										[
+											$elm$html$Html$text('Download')
+										]))
+								]))
+						]));
+			} else {
+				return $elm$html$Html$text('');
+			}
+		} else {
+			return $elm$html$Html$text('');
+		}
+	}();
 	return A2(
 		$elm$html$Html$div,
 		_List_Nil,
@@ -5962,7 +6112,7 @@ var $author$project$Main$view = function (model) {
 							]),
 						_List_Nil)
 					])),
-				buttonView,
+				buttonsView,
 				audioView,
 				A2(
 				$elm$html$Html$pre,

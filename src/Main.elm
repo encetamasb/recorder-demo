@@ -1,9 +1,10 @@
 port module Main exposing (main)
 
+import Array exposing (Array)
 import Browser
 import Debug
-import Html exposing (Html, button, div, input, label, p, pre, text)
-import Html.Attributes exposing (disabled, for, name, placeholder, style, title, type_, value, width)
+import Html exposing (Html, audio, button, div, input, label, p, pre, text)
+import Html.Attributes exposing (controls, disabled, for, name, placeholder, src, style, title, type_, value, width)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -26,6 +27,11 @@ minSecs =
     1
 
 
+tickDelta : Float
+tickDelta =
+    1000
+
+
 type alias ID =
     Int
 
@@ -34,6 +40,9 @@ type alias Item =
     { id : ID
     , title : String
     , length : Int
+    , mime : Maybe String
+    , url : Maybe String
+    , size : Maybe Int
     }
 
 
@@ -57,6 +66,7 @@ type Status
     = Configuring Input
     | Initalized ValidInput
     | Recording Item DownCounter
+    | WentWrong Item String
     | Success Item
 
 
@@ -68,7 +78,8 @@ type alias Model =
 
 type RecorderEvent
     = StartedEvent ID
-    | StoppedEvent ID
+    | StoppedEvent ID { url : String, mime : String }
+    | DataChunkEvent ID { size : Int }
 
 
 type Msg
@@ -78,7 +89,7 @@ type Msg
     | StopClicked
     | Tick ID
     | NewClicked
-    | FromRecorder (Maybe RecorderEvent)
+    | FromRecorder (Result String RecorderEvent)
 
 
 initialStatus : Status
@@ -147,14 +158,17 @@ update msg ({ status, nextId } as model) =
             ( { model | status = toStatus { input | length = toLength s } }, Cmd.none )
 
         ( Initalized { title, length }, RecordClicked ) ->
-            ( { model | nextId = nextId + 1 }, sendStartedEvent nextId )
+            ( { model | nextId = nextId + 1 }, sendStartedEvent nextId length )
 
-        ( Initalized { title, length }, FromRecorder (Just (StartedEvent id)) ) ->
+        ( Initalized { title, length }, FromRecorder (Ok (StartedEvent id)) ) ->
             let
                 item =
                     { title = title
                     , length = length
                     , id = id
+                    , size = Nothing
+                    , mime = Nothing
+                    , url = Nothing
                     }
             in
             ( { model | status = Recording item (DownCounter length) }
@@ -164,9 +178,24 @@ update msg ({ status, nextId } as model) =
         ( Recording item _, StopClicked ) ->
             ( { model | status = Success item }, sendStoppedEvent item.id )
 
-        ( Recording item _, FromRecorder (Just (StoppedEvent id)) ) ->
+        ( Recording item _, FromRecorder (Ok (StoppedEvent id { mime, url })) ) ->
             if item.id == id then
-                ( { model | status = Success item }, Cmd.none )
+                let
+                    updatedItem =
+                        { item | mime = Just mime, url = Just url }
+                in
+                ( { model | status = Success updatedItem }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+        ( Recording item downc, FromRecorder (Ok (DataChunkEvent id { size })) ) ->
+            if item.id == id then
+                let
+                    updatedItem =
+                        { item | size = Just <| Maybe.withDefault 0 item.size + size }
+                in
+                ( { model | status = Recording updatedItem downc }, Cmd.none )
 
             else
                 ( model, Cmd.none )
@@ -208,11 +237,14 @@ view ({ status } as model) =
                 Initalized { title, length } ->
                     ( title, String.fromInt length, False )
 
-                Recording item _ ->
-                    ( item.title, String.fromInt item.length, True )
+                Recording { title, length } _ ->
+                    ( title, String.fromInt length, True )
 
-                Success item ->
-                    ( item.title, String.fromInt item.length, True )
+                Success { title, length } ->
+                    ( title, String.fromInt length, True )
+
+                WentWrong { title, length } err ->
+                    ( title, String.fromInt length, True )
 
         buttonView =
             case status of
@@ -222,11 +254,38 @@ view ({ status } as model) =
                 Initalized s ->
                     button [ onClick RecordClicked, title "Record" ] [ text "Record" ]
 
-                Recording item _ ->
-                    button [ onClick StopClicked, title "Stop" ] [ text "Stop" ]
+                Recording item (DownCounter n) ->
+                    let
+                        s =
+                            "Stop (" ++ String.fromInt n ++ ")"
+                    in
+                    button [ onClick StopClicked, title s ] [ text s ]
+
+                WentWrong item err ->
+                    button [ onClick NewClicked, title "New" ] [ text "New" ]
 
                 Success item ->
                     button [ onClick NewClicked, title "New" ] [ text "New" ]
+
+        audioView =
+            case status of
+                Success { url, mime } ->
+                    case ( url, mime ) of
+                        ( Just source, Just mtype ) ->
+                            div []
+                                [ audio
+                                    [ src source
+                                    , type_ mtype
+                                    , controls True
+                                    ]
+                                    []
+                                ]
+
+                        _ ->
+                            text ""
+
+                _ ->
+                    text ""
     in
     div []
         [ p []
@@ -254,6 +313,7 @@ view ({ status } as model) =
                 []
             ]
         , buttonView
+        , audioView
         , pre
             []
             [ text << Debug.toString <| model.status ]
@@ -262,46 +322,72 @@ view ({ status } as model) =
 
 tick : ID -> Cmd Msg
 tick id =
-    Process.sleep 1000 |> Task.perform (always (Tick id))
+    Process.sleep tickDelta |> Task.perform (always (Tick id))
 
 
-eventObject event id =
-    Encode.object
-        [ ( "event", Encode.string event )
-        , ( "id", Encode.int id )
-        ]
-
-
-sendStartedEvent id =
-    toRecorder (eventObject "started" id)
+sendStartedEvent id length =
+    toRecorder <|
+        Encode.object
+            [ ( "event", Encode.string "started" )
+            , ( "id", Encode.int id )
+            , ( "length", Encode.int length )
+            ]
 
 
 sendStoppedEvent id =
-    toRecorder (eventObject "stopped" id)
+    toRecorder <|
+        Encode.object
+            [ ( "event", Encode.string "stopped" )
+            , ( "id", Encode.int id )
+            ]
 
 
 decodeEvent =
-    Decode.map2 (\event id -> { event = event, id = id })
+    Decode.map5
+        (\event id size mime url ->
+            { event = event
+            , id = id
+            , maybeSize = size
+            , maybeMime = mime
+            , maybeUrl = url
+            }
+        )
         (Decode.field "event" Decode.string)
         (Decode.field "id" Decode.int)
+        (Decode.maybe (Decode.field "size" Decode.int))
+        (Decode.maybe (Decode.field "mime" Decode.string))
+        (Decode.maybe (Decode.field "url" Decode.string))
 
 
-mapToRecorderEvent : Decode.Value -> Maybe RecorderEvent
+mapToRecorderEvent : Decode.Value -> Result String RecorderEvent
 mapToRecorderEvent json =
-    case Debug.log "in" (Decode.decodeValue decodeEvent json) of
-        Ok { event, id } ->
+    case Debug.log "a" (Decode.decodeValue decodeEvent json) of
+        Ok { event, id, maybeSize, maybeMime, maybeUrl } ->
             case event of
                 "started" ->
-                    Just <| StartedEvent id
+                    Ok (StartedEvent id)
 
                 "stopped" ->
-                    Just <| StoppedEvent id
+                    case ( maybeMime, maybeUrl ) of
+                        ( Just mime, Just url ) ->
+                            Ok (StoppedEvent id { url = url, mime = mime })
 
-                _ ->
-                    Nothing
+                        _ ->
+                            Err "Missing data url or mime"
+
+                "datachunk" ->
+                    case maybeSize of
+                        Just size ->
+                            Ok (DataChunkEvent id { size = size })
+
+                        Nothing ->
+                            Err "Missing data size"
+
+                m ->
+                    Err <| "Unknown message (" ++ m ++ ")"
 
         Err err ->
-            Nothing
+            Err "Decoding error"
 
 
 port toRecorder : Encode.Value -> Cmd msg

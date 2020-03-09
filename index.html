@@ -13,37 +13,63 @@
             flags: {}
         });
 
-        var recorder, gumStream;
+        var recorder, curStream;
+        var chunks = [];
+
+        var chunkDelta = 1000;
 
         app.ports.toRecorder.subscribe(function(msg) {
             switch (msg.event) {
                 case "started":
                     navigator.mediaDevices.getUserMedia({
-                        audio: true
+                        audio: true,
+                        video: false
                     }).then(function(stream) {
-                        gumStream = stream;
+                        chunks = [];
+
+                        curStream = stream;
                         recorder = new MediaRecorder(stream);
-                        recorder.ondataavailable = function(e) {  // FIXME
-                            var url = URL.createObjectURL(e.data);
-                            var preview = document.createElement('audio');
-                            preview.controls = true;
-                            preview.src = url;
-                            document.body.appendChild(preview);
+
+                        recorder.ondataavailable = function(e) {
+                            chunks.push(e.data);
+                            e.data.arrayBuffer().then(function(buffer) {
+                                app.ports.fromRecorder.send({
+                                    event: "datachunk",
+                                    id: msg.id,
+                                    size: buffer.byteLength
+                                });
+                            });
                         };
-                        recorder.start(); // FIXME
+
+                        recorder.start(chunkDelta);
+
                         app.ports.fromRecorder.send({
                             event: "started",
-                            id: msg.id
+                            id: msg.id,
                         });
                     })
 
                     break;
                 case "stopped":
                     recorder.stop()
-                    gumStream.getAudioTracks()[0].stop(); // FIXME
+
+                    curStream.getAudioTracks().forEach(function(track){
+                        track.stop();
+                    });
+
+                    var blob = chunks.reduce(function(a, b) {
+                        return new Blob([a, b], {type: a.type})
+                    });
+
+                    var url = URL.createObjectURL(blob);
+
+                    console.log(blob, url);
+
                     app.ports.fromRecorder.send({
                         event: "stopped",
-                        id: msg.id
+                        id: msg.id,
+                        url: url,
+                        mime: blob.type
                     });
                     break;
                 default:

@@ -5144,15 +5144,19 @@ var $elm$core$Task$perform = F2(
 				A2($elm$core$Task$map, toMessage, task)));
 	});
 var $elm$browser$Browser$element = _Browser_element;
-var $author$project$Main$Configuring = function (a) {
-	return {$: 'Configuring', a: a};
-};
+var $author$project$Main$Configuring = F2(
+	function (a, b) {
+		return {$: 'Configuring', a: a, b: b};
+	});
+var $author$project$Main$Untouched = {$: 'Untouched'};
 var $author$project$Main$defaultSecs = 15;
-var $author$project$Main$initialStatus = $author$project$Main$Configuring(
+var $author$project$Main$initialStatus = A2(
+	$author$project$Main$Configuring,
 	{
 		length: $elm$core$Result$Ok($author$project$Main$defaultSecs),
 		title: $elm$core$Maybe$Nothing
-	});
+	},
+	$author$project$Main$Untouched);
 var $author$project$Main$initialModel = {nextId: 0, status: $author$project$Main$initialStatus};
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
@@ -5284,6 +5288,7 @@ var $author$project$Main$Recording = F2(
 var $author$project$Main$Success = function (a) {
 	return {$: 'Success', a: a};
 };
+var $author$project$Main$Touched = {$: 'Touched'};
 var $author$project$Main$WentWrong = F2(
 	function (a, b) {
 		return {$: 'WentWrong', a: a, b: b};
@@ -5383,6 +5388,7 @@ var $author$project$Main$tick = function (id) {
 			$author$project$Main$Tick(id)),
 		$elm$core$Process$sleep($author$project$Main$tickDelta));
 };
+var $elm$core$String$trim = _String_trim;
 var $elm$core$Maybe$withDefault = F2(
 	function (_default, maybe) {
 		if (maybe.$ === 'Just') {
@@ -5397,23 +5403,26 @@ var $author$project$Main$update = F2(
 		var status = model.status;
 		var nextId = model.nextId;
 		var toTitle = function (s) {
-			if (s === '') {
-				return $elm$core$Maybe$Nothing;
+			var _v19 = $elm$core$String$trim(s);
+			if (_v19 === '') {
+				return $elm$core$Maybe$Just(
+					$elm$core$Result$Err(s));
 			} else {
-				return $elm$core$Maybe$Just(s);
+				return $elm$core$Maybe$Just(
+					$elm$core$Result$Ok(s));
 			}
 		};
 		var toStatus = function (input) {
 			var title = input.title;
 			var length = input.length;
-			var _v16 = _Utils_Tuple2(title, length);
-			if ((_v16.a.$ === 'Just') && (_v16.b.$ === 'Ok')) {
-				var t = _v16.a.a;
-				var l = _v16.b.a;
+			var _v18 = _Utils_Tuple2(title, length);
+			if (((_v18.a.$ === 'Just') && (_v18.a.a.$ === 'Ok')) && (_v18.b.$ === 'Ok')) {
+				var t = _v18.a.a.a;
+				var l = _v18.b.a;
 				return $author$project$Main$Initalized(
 					{length: l, title: t});
 			} else {
-				return $author$project$Main$Configuring(input);
+				return A2($author$project$Main$Configuring, input, $author$project$Main$Touched);
 			}
 		};
 		var toLength = function (s) {
@@ -5431,7 +5440,8 @@ var $author$project$Main$update = F2(
 		var toInput = function (validInput) {
 			return {
 				length: $elm$core$Result$Ok(validInput.length),
-				title: $elm$core$Maybe$Just(validInput.title)
+				title: $elm$core$Maybe$Just(
+					$elm$core$Result$Ok(validInput.title))
 			};
 		};
 		var _v0 = _Utils_Tuple2(status, msg);
@@ -5441,7 +5451,8 @@ var $author$project$Main$update = F2(
 				case 'TitleChanged':
 					switch (_v0.a.$) {
 						case 'Configuring':
-							var input = _v0.a.a;
+							var _v1 = _v0.a;
+							var input = _v1.a;
 							var s = _v0.b.a;
 							return _Utils_Tuple2(
 								_Utils_update(
@@ -5477,7 +5488,8 @@ var $author$project$Main$update = F2(
 				case 'LengthChanged':
 					switch (_v0.a.$) {
 						case 'Configuring':
-							var input = _v0.a.a;
+							var _v2 = _v0.a;
+							var input = _v2.a;
 							var s = _v0.b.a;
 							return _Utils_Tuple2(
 								_Utils_update(
@@ -5514,7 +5526,7 @@ var $author$project$Main$update = F2(
 					if (_v0.a.$ === 'Initalized') {
 						var title = _v0.a.a.title;
 						var length = _v0.a.a.length;
-						var _v1 = _v0.b;
+						var _v3 = _v0.b;
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
@@ -5525,10 +5537,10 @@ var $author$project$Main$update = F2(
 					}
 				case 'StopClicked':
 					if (_v0.a.$ === 'Recording') {
-						var _v2 = _v0.a;
-						var item = _v2.a;
-						var dc = _v2.b;
-						var _v3 = _v0.b;
+						var _v4 = _v0.a;
+						var item = _v4.a;
+						var dc = _v4.b;
+						var _v5 = _v0.b;
 						return _Utils_Tuple2(
 							model,
 							$author$project$Main$sendStoppedEvent(item.id));
@@ -5543,7 +5555,14 @@ var $author$project$Main$update = F2(
 									var title = _v0.a.a.title;
 									var length = _v0.a.a.length;
 									var id = _v0.b.a.a.a;
-									var item = {id: id, length: length, mime: $elm$core$Maybe$Nothing, size: $elm$core$Maybe$Nothing, title: title, url: $elm$core$Maybe$Nothing};
+									var item = {
+										id: id,
+										length: length,
+										mime: $elm$core$Maybe$Nothing,
+										size: $elm$core$Maybe$Nothing,
+										title: $elm$core$String$trim(title),
+										url: $elm$core$Maybe$Nothing
+									};
 									return _Utils_Tuple2(
 										_Utils_update(
 											model,
@@ -5560,12 +5579,12 @@ var $author$project$Main$update = F2(
 							case 'StoppedEvent':
 								if (_v0.a.$ === 'Recording') {
 									if (_v0.b.a.a.b.$ === 'Just') {
-										var _v4 = _v0.a;
-										var item = _v4.a;
-										var _v5 = _v0.b.a.a;
-										var id = _v5.a;
-										var mime = _v5.b.a.mime;
-										var url = _v5.b.a.url;
+										var _v6 = _v0.a;
+										var item = _v6.a;
+										var _v7 = _v0.b.a.a;
+										var id = _v7.a;
+										var mime = _v7.b.a.mime;
+										var url = _v7.b.a.url;
 										if (_Utils_eq(item.id, id)) {
 											var updatedItem = _Utils_update(
 												item,
@@ -5584,11 +5603,11 @@ var $author$project$Main$update = F2(
 											return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 										}
 									} else {
-										var _v6 = _v0.a;
-										var item = _v6.a;
-										var _v7 = _v0.b.a.a;
-										var id = _v7.a;
-										var _v8 = _v7.b;
+										var _v8 = _v0.a;
+										var item = _v8.a;
+										var _v9 = _v0.b.a.a;
+										var id = _v9.a;
+										var _v10 = _v9.b;
 										return _Utils_eq(item.id, id) ? _Utils_Tuple2(
 											_Utils_update(
 												model,
@@ -5602,12 +5621,12 @@ var $author$project$Main$update = F2(
 								}
 							case 'DataChunkEvent':
 								if (_v0.a.$ === 'Recording') {
-									var _v9 = _v0.a;
-									var item = _v9.a;
-									var downc = _v9.b;
-									var _v10 = _v0.b.a.a;
-									var id = _v10.a;
-									var size = _v10.b.size;
+									var _v11 = _v0.a;
+									var item = _v11.a;
+									var downc = _v11.b;
+									var _v12 = _v0.b.a.a;
+									var id = _v12.a;
+									var size = _v12.b.size;
 									if (_Utils_eq(item.id, id)) {
 										var updatedItem = _Utils_update(
 											item,
@@ -5629,7 +5648,7 @@ var $author$project$Main$update = F2(
 									break _v0$13;
 								}
 							default:
-								var _v11 = _v0.b.a.a;
+								var _v13 = _v0.b.a.a;
 								var _new = $author$project$Main$initialModel;
 								return _Utils_Tuple2(
 									_Utils_update(
@@ -5642,17 +5661,17 @@ var $author$project$Main$update = F2(
 					}
 				case 'Tick':
 					if (_v0.a.$ === 'Recording') {
-						var _v12 = _v0.a;
-						var item = _v12.a;
-						var remaining = _v12.b.a;
+						var _v14 = _v0.a;
+						var item = _v14.a;
+						var remaining = _v14.b.a;
 						var id = _v0.b.a;
-						var _v13 = _Utils_Tuple2(
+						var _v15 = _Utils_Tuple2(
 							_Utils_eq(item.id, id),
 							remaining);
-						if (!_v13.a) {
+						if (!_v15.a) {
 							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 						} else {
-							if (!_v13.b) {
+							if (!_v15.b) {
 								return _Utils_Tuple2(
 									_Utils_update(
 										model,
@@ -5680,27 +5699,23 @@ var $author$project$Main$update = F2(
 						break _v0$13;
 					}
 				default:
-					var _v14 = _v0.b;
+					var _v16 = _v0.b;
 					return _Utils_Tuple2(model, $author$project$Main$sendResetedEvent);
 			}
 		}
 		var st = _v0.a;
 		var event = _v0.b;
-		var _v15 = A2(
+		var _v17 = A2(
 			$elm$core$Debug$log,
 			'unhandled msg',
 			_Utils_Tuple2(st, event));
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
-var $author$project$Main$LengthChanged = function (a) {
-	return {$: 'LengthChanged', a: a};
-};
+var $author$project$Main$Disabled = {$: 'Disabled'};
+var $author$project$Main$Enabled = {$: 'Enabled'};
 var $author$project$Main$RecordClicked = {$: 'RecordClicked'};
 var $author$project$Main$ResetClicked = {$: 'ResetClicked'};
 var $author$project$Main$StopClicked = {$: 'StopClicked'};
-var $author$project$Main$TitleChanged = function (a) {
-	return {$: 'TitleChanged', a: a};
-};
 var $elm$html$Html$a = _VirtualDom_node('a');
 var $elm$html$Html$audio = _VirtualDom_node('audio');
 var $elm$html$Html$button = _VirtualDom_node('button');
@@ -5725,15 +5740,254 @@ var $elm$html$Html$Attributes$stringProperty = F2(
 var $elm$html$Html$Attributes$download = function (fileName) {
 	return A2($elm$html$Html$Attributes$stringProperty, 'download', fileName);
 };
-var $elm$html$Html$Attributes$for = $elm$html$Html$Attributes$stringProperty('htmlFor');
 var $elm$html$Html$Attributes$href = function (url) {
 	return A2(
 		$elm$html$Html$Attributes$stringProperty,
 		'href',
 		_VirtualDom_noJavaScriptUri(url));
 };
+var $author$project$Main$LengthChanged = function (a) {
+	return {$: 'LengthChanged', a: a};
+};
+var $author$project$Main$TitleChanged = function (a) {
+	return {$: 'TitleChanged', a: a};
+};
+var $author$project$Main$enabledToBool = function (v) {
+	if (v.$ === 'Enabled') {
+		return true;
+	} else {
+		return false;
+	}
+};
+var $elm$html$Html$Attributes$for = $elm$html$Html$Attributes$stringProperty('htmlFor');
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$html$Html$label = _VirtualDom_node('label');
+var $elm$html$Html$Attributes$name = $elm$html$Html$Attributes$stringProperty('name');
+var $elm$core$Basics$not = _Basics_not;
+var $elm$html$Html$Events$alwaysStop = function (x) {
+	return _Utils_Tuple2(x, true);
+};
+var $elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
+	return {$: 'MayStopPropagation', a: a};
+};
+var $elm$virtual_dom$VirtualDom$on = _VirtualDom_on;
+var $elm$html$Html$Events$stopPropagationOn = F2(
+	function (event, decoder) {
+		return A2(
+			$elm$virtual_dom$VirtualDom$on,
+			event,
+			$elm$virtual_dom$VirtualDom$MayStopPropagation(decoder));
+	});
+var $elm$json$Json$Decode$at = F2(
+	function (fields, decoder) {
+		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
+	});
+var $elm$html$Html$Events$targetValue = A2(
+	$elm$json$Json$Decode$at,
+	_List_fromArray(
+		['target', 'value']),
+	$elm$json$Json$Decode$string);
+var $elm$html$Html$Events$onInput = function (tagger) {
+	return A2(
+		$elm$html$Html$Events$stopPropagationOn,
+		'input',
+		A2(
+			$elm$json$Json$Decode$map,
+			$elm$html$Html$Events$alwaysStop,
+			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
+};
+var $elm$html$Html$p = _VirtualDom_node('p');
+var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
+var $elm$html$Html$span = _VirtualDom_node('span');
+var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
+var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
+var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
+var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
+var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
+var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
+var $author$project$Main$inputsView = function (status) {
+	var inputError = function (m) {
+		if (m.$ === 'Just') {
+			var err = m.a;
+			return A2(
+				$elm$html$Html$span,
+				_List_fromArray(
+					[
+						A2($elm$html$Html$Attributes$style, 'margin-left', '5px'),
+						A2($elm$html$Html$Attributes$style, 'color', 'red')
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text(err)
+					]));
+		} else {
+			return $elm$html$Html$text('');
+		}
+	};
+	var _v0 = function () {
+		switch (status.$) {
+			case 'Configuring':
+				var title = status.a.title;
+				var length = status.a.length;
+				var untouched = status.b;
+				var ifTouched = function () {
+					if (untouched.$ === 'Untouched') {
+						return $elm$core$Basics$always($elm$core$Maybe$Nothing);
+					} else {
+						return $elm$core$Maybe$Just;
+					}
+				}();
+				return _Utils_Tuple3(
+					function () {
+						if (title.$ === 'Just') {
+							if (title.a.$ === 'Ok') {
+								var t = title.a.a;
+								return _Utils_Tuple2(t, $elm$core$Maybe$Nothing);
+							} else {
+								var t = title.a.a;
+								return _Utils_Tuple2(
+									t,
+									ifTouched('Required.'));
+							}
+						} else {
+							return _Utils_Tuple2(
+								'',
+								ifTouched('Required.'));
+						}
+					}(),
+					function () {
+						if (length.$ === 'Ok') {
+							var l = length.a;
+							return _Utils_Tuple2(
+								$elm$core$String$fromInt(l),
+								$elm$core$Maybe$Nothing);
+						} else {
+							var s = length.a;
+							return _Utils_Tuple2(
+								s,
+								ifTouched(
+									'Must be a whole number between ' + ($elm$core$String$fromInt($author$project$Main$minSecs) + (' and ' + $elm$core$String$fromInt($author$project$Main$maxSecs)))));
+						}
+					}(),
+					$author$project$Main$Enabled);
+			case 'Initalized':
+				var title = status.a.title;
+				var length = status.a.length;
+				return _Utils_Tuple3(
+					_Utils_Tuple2(title, $elm$core$Maybe$Nothing),
+					_Utils_Tuple2(
+						$elm$core$String$fromInt(length),
+						$elm$core$Maybe$Nothing),
+					$author$project$Main$Enabled);
+			case 'Recording':
+				var title = status.a.title;
+				var length = status.a.length;
+				return _Utils_Tuple3(
+					_Utils_Tuple2(title, $elm$core$Maybe$Nothing),
+					_Utils_Tuple2(
+						$elm$core$String$fromInt(length),
+						$elm$core$Maybe$Nothing),
+					$author$project$Main$Disabled);
+			case 'Success':
+				var title = status.a.title;
+				var length = status.a.length;
+				return _Utils_Tuple3(
+					_Utils_Tuple2(title, $elm$core$Maybe$Nothing),
+					_Utils_Tuple2(
+						$elm$core$String$fromInt(length),
+						$elm$core$Maybe$Nothing),
+					$author$project$Main$Disabled);
+			default:
+				var title = status.a.title;
+				var length = status.a.length;
+				var err = status.b;
+				return _Utils_Tuple3(
+					_Utils_Tuple2(title, $elm$core$Maybe$Nothing),
+					_Utils_Tuple2(
+						$elm$core$String$fromInt(length),
+						$elm$core$Maybe$Nothing),
+					$author$project$Main$Disabled);
+		}
+	}();
+	var _v1 = _v0.a;
+	var title_ = _v1.a;
+	var titleErr = _v1.b;
+	var _v2 = _v0.b;
+	var length_ = _v2.a;
+	var lengthErr = _v2.b;
+	var inputsDisabled = _v0.c;
+	return A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				$elm$html$Html$p,
+				_List_Nil,
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$label,
+						_List_fromArray(
+							[
+								A2($elm$html$Html$Attributes$style, 'display', 'block'),
+								$elm$html$Html$Attributes$for('title')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('Title of recording')
+							])),
+						A2(
+						$elm$html$Html$input,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$type_('text'),
+								$elm$html$Html$Attributes$name('title'),
+								$elm$html$Html$Attributes$value(title_),
+								A2(
+								$elm$core$Basics$composeL,
+								A2($elm$core$Basics$composeL, $elm$html$Html$Attributes$disabled, $elm$core$Basics$not),
+								$author$project$Main$enabledToBool)(inputsDisabled),
+								$elm$html$Html$Attributes$placeholder('Type here..'),
+								$elm$html$Html$Events$onInput($author$project$Main$TitleChanged)
+							]),
+						_List_Nil),
+						inputError(titleErr)
+					])),
+				A2(
+				$elm$html$Html$p,
+				_List_Nil,
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$label,
+						_List_fromArray(
+							[
+								A2($elm$html$Html$Attributes$style, 'display', 'block'),
+								$elm$html$Html$Attributes$for('length')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('Length in seconds')
+							])),
+						A2(
+						$elm$html$Html$input,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$type_('number'),
+								$elm$html$Html$Attributes$name('length'),
+								$elm$html$Html$Attributes$value(length_),
+								A2(
+								$elm$core$Basics$composeL,
+								A2($elm$core$Basics$composeL, $elm$html$Html$Attributes$disabled, $elm$core$Basics$not),
+								$author$project$Main$enabledToBool)(inputsDisabled),
+								$elm$html$Html$Events$onInput($author$project$Main$LengthChanged)
+							]),
+						_List_Nil),
+						inputError(lengthErr)
+					]))
+			]));
+};
 var $elm$core$List$filter = F2(
 	function (isGood, list) {
 		return A3(
@@ -5781,11 +6035,9 @@ var $author$project$Main$mimeToExtension = function (mime) {
 				'ext',
 				A2($elm$core$List$filter, match, possible))));
 };
-var $elm$html$Html$Attributes$name = $elm$html$Html$Attributes$stringProperty('name');
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
 };
-var $elm$virtual_dom$VirtualDom$on = _VirtualDom_on;
 var $elm$html$Html$Events$on = F2(
 	function (event, decoder) {
 		return A2(
@@ -5799,39 +6051,6 @@ var $elm$html$Html$Events$onClick = function (msg) {
 		'click',
 		$elm$json$Json$Decode$succeed(msg));
 };
-var $elm$html$Html$Events$alwaysStop = function (x) {
-	return _Utils_Tuple2(x, true);
-};
-var $elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
-	return {$: 'MayStopPropagation', a: a};
-};
-var $elm$html$Html$Events$stopPropagationOn = F2(
-	function (event, decoder) {
-		return A2(
-			$elm$virtual_dom$VirtualDom$on,
-			event,
-			$elm$virtual_dom$VirtualDom$MayStopPropagation(decoder));
-	});
-var $elm$json$Json$Decode$at = F2(
-	function (fields, decoder) {
-		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
-	});
-var $elm$html$Html$Events$targetValue = A2(
-	$elm$json$Json$Decode$at,
-	_List_fromArray(
-		['target', 'value']),
-	$elm$json$Json$Decode$string);
-var $elm$html$Html$Events$onInput = function (tagger) {
-	return A2(
-		$elm$html$Html$Events$stopPropagationOn,
-		'input',
-		A2(
-			$elm$json$Json$Decode$map,
-			$elm$html$Html$Events$alwaysStop,
-			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
-};
-var $elm$html$Html$p = _VirtualDom_node('p');
-var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
 var $elm$html$Html$pre = _VirtualDom_node('pre');
 var $elm$html$Html$Attributes$src = function (url) {
 	return A2(
@@ -5839,19 +6058,13 @@ var $elm$html$Html$Attributes$src = function (url) {
 		'src',
 		_VirtualDom_noJavaScriptOrHtmlUri(url));
 };
-var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
-var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
-var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
-var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$html$Html$Attributes$title = $elm$html$Html$Attributes$stringProperty('title');
 var $elm$core$Debug$toString = _Debug_toString;
-var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
-var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
 var $author$project$Main$view = function (model) {
 	var status = model.status;
 	var buttonView = F3(
 		function (t, msg, isDisabled) {
-			if (isDisabled) {
+			if (isDisabled.$ === 'Disabled') {
 				return A2(
 					$elm$html$Html$button,
 					_List_fromArray(
@@ -5878,16 +6091,19 @@ var $author$project$Main$view = function (model) {
 			}
 		});
 	var buttonsView = function () {
-		var stopBtn = F2(
-			function (s, isDisabled) {
-				return A3(buttonView, s, $author$project$Main$StopClicked, isDisabled);
-			});
+		var stopBtn = function (isDisabled) {
+			return A3(buttonView, 'Stop', $author$project$Main$StopClicked, isDisabled);
+		};
 		var resetBtn = function (isDisabled) {
 			return A3(buttonView, 'Reset', $author$project$Main$ResetClicked, isDisabled);
 		};
 		var recBtn = function (isDisabled) {
 			return A3(buttonView, 'Record', $author$project$Main$RecordClicked, isDisabled);
 		};
+		var downStopBtn = F2(
+			function (s, isDisabled) {
+				return A3(buttonView, s, $author$project$Main$StopClicked, isDisabled);
+			});
 		switch (status.$) {
 			case 'Configuring':
 				return A2(
@@ -5895,9 +6111,9 @@ var $author$project$Main$view = function (model) {
 					_List_Nil,
 					_List_fromArray(
 						[
-							recBtn(true),
-							A2(stopBtn, 'Stop', true),
-							resetBtn(false)
+							recBtn($author$project$Main$Disabled),
+							stopBtn($author$project$Main$Disabled),
+							resetBtn($author$project$Main$Enabled)
 						]));
 			case 'Initalized':
 				var s = status.a;
@@ -5906,9 +6122,9 @@ var $author$project$Main$view = function (model) {
 					_List_Nil,
 					_List_fromArray(
 						[
-							recBtn(false),
-							A2(stopBtn, 'Stop', true),
-							resetBtn(false)
+							recBtn($author$project$Main$Enabled),
+							stopBtn($author$project$Main$Disabled),
+							resetBtn($author$project$Main$Enabled)
 						]));
 			case 'Recording':
 				var item = status.a;
@@ -5919,9 +6135,9 @@ var $author$project$Main$view = function (model) {
 					_List_Nil,
 					_List_fromArray(
 						[
-							recBtn(true),
-							A2(stopBtn, s, false),
-							resetBtn(false)
+							recBtn($author$project$Main$Disabled),
+							A2(downStopBtn, s, $author$project$Main$Enabled),
+							resetBtn($author$project$Main$Enabled)
 						]));
 			case 'WentWrong':
 				var item = status.a;
@@ -5931,9 +6147,9 @@ var $author$project$Main$view = function (model) {
 					_List_Nil,
 					_List_fromArray(
 						[
-							recBtn(true),
-							A2(stopBtn, 'Stop', true),
-							resetBtn(false)
+							recBtn($author$project$Main$Disabled),
+							stopBtn($author$project$Main$Disabled),
+							resetBtn($author$project$Main$Enabled)
 						]));
 			default:
 				var item = status.a;
@@ -5942,71 +6158,21 @@ var $author$project$Main$view = function (model) {
 					_List_Nil,
 					_List_fromArray(
 						[
-							recBtn(true),
-							A2(stopBtn, 'Stop', true),
-							resetBtn(false)
+							recBtn($author$project$Main$Disabled),
+							stopBtn($author$project$Main$Disabled),
+							resetBtn($author$project$Main$Enabled)
 						]));
 		}
 	}();
-	var _v0 = function () {
-		switch (status.$) {
-			case 'Configuring':
-				var title = status.a.title;
-				var length = status.a.length;
-				return _Utils_Tuple3(
-					A2($elm$core$Maybe$withDefault, '', title),
-					function () {
-						if (length.$ === 'Ok') {
-							var l = length.a;
-							return $elm$core$String$fromInt(l);
-						} else {
-							var s = length.a;
-							return s;
-						}
-					}(),
-					false);
-			case 'Initalized':
-				var title = status.a.title;
-				var length = status.a.length;
-				return _Utils_Tuple3(
-					title,
-					$elm$core$String$fromInt(length),
-					false);
-			case 'Recording':
-				var title = status.a.title;
-				var length = status.a.length;
-				return _Utils_Tuple3(
-					title,
-					$elm$core$String$fromInt(length),
-					true);
-			case 'Success':
-				var title = status.a.title;
-				var length = status.a.length;
-				return _Utils_Tuple3(
-					title,
-					$elm$core$String$fromInt(length),
-					true);
-			default:
-				var title = status.a.title;
-				var length = status.a.length;
-				var err = status.b;
-				return _Utils_Tuple3(
-					title,
-					$elm$core$String$fromInt(length),
-					true);
-		}
-	}();
-	var recTitle = _v0.a;
-	var recLength = _v0.b;
-	var inputsDisabled = _v0.c;
 	var audioView = function () {
 		if (status.$ === 'Success') {
+			var title = status.a.title;
 			var url = status.a.url;
 			var mime = status.a.mime;
-			var _v4 = _Utils_Tuple2(url, mime);
-			if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
-				var source = _v4.a.a;
-				var mtype = _v4.b.a;
+			var _v1 = _Utils_Tuple2(url, mime);
+			if ((_v1.a.$ === 'Just') && (_v1.b.$ === 'Just')) {
+				var source = _v1.a.a;
+				var mtype = _v1.b.a;
 				var ext = A2(
 					$elm$core$Maybe$withDefault,
 					'bin',
@@ -6035,7 +6201,7 @@ var $author$project$Main$view = function (model) {
 									_List_fromArray(
 										[
 											$elm$html$Html$Attributes$href(source),
-											$elm$html$Html$Attributes$download(recTitle + ('.' + ext))
+											$elm$html$Html$Attributes$download(title + ('.' + ext))
 										]),
 									_List_fromArray(
 										[
@@ -6055,63 +6221,7 @@ var $author$project$Main$view = function (model) {
 		_List_Nil,
 		_List_fromArray(
 			[
-				A2(
-				$elm$html$Html$p,
-				_List_Nil,
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$label,
-						_List_fromArray(
-							[
-								A2($elm$html$Html$Attributes$style, 'display', 'block'),
-								$elm$html$Html$Attributes$for('title')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('Title of recording')
-							])),
-						A2(
-						$elm$html$Html$input,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$type_('text'),
-								$elm$html$Html$Attributes$name('title'),
-								$elm$html$Html$Attributes$value(recTitle),
-								$elm$html$Html$Attributes$disabled(inputsDisabled),
-								$elm$html$Html$Attributes$placeholder('Type here..'),
-								$elm$html$Html$Events$onInput($author$project$Main$TitleChanged)
-							]),
-						_List_Nil)
-					])),
-				A2(
-				$elm$html$Html$p,
-				_List_Nil,
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$label,
-						_List_fromArray(
-							[
-								A2($elm$html$Html$Attributes$style, 'display', 'block'),
-								$elm$html$Html$Attributes$for('length')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('Length in seconds')
-							])),
-						A2(
-						$elm$html$Html$input,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$type_('number'),
-								$elm$html$Html$Attributes$name('length'),
-								$elm$html$Html$Attributes$value(recLength),
-								$elm$html$Html$Attributes$disabled(inputsDisabled),
-								$elm$html$Html$Events$onInput($author$project$Main$LengthChanged)
-							]),
-						_List_Nil)
-					])),
+				$author$project$Main$inputsView(status),
 				buttonsView,
 				audioView,
 				A2(

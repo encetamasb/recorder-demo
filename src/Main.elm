@@ -3,8 +3,8 @@ port module Main exposing (main)
 import Array exposing (Array)
 import Browser
 import Debug
-import Html exposing (Html, a, audio, button, div, input, label, p, pre, text)
-import Html.Attributes exposing (controls, disabled, download, for, href, name, placeholder, src, style, title, type_, value, width)
+import Html exposing (Html, a, audio, button, div, input, label, p, pre, span, text)
+import Html.Attributes exposing (autofocus, controls, disabled, download, for, href, name, placeholder, src, style, title, type_, value, width)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -47,7 +47,7 @@ type alias Item =
 
 
 type alias Input =
-    { title : Maybe String
+    { title : Maybe (Result String String)
     , length : Result String Int
     }
 
@@ -62,8 +62,28 @@ type DownCounter
     = DownCounter Int
 
 
+type Untouched
+    = Untouched
+    | Touched
+
+
+type Enabled
+    = Enabled
+    | Disabled
+
+
+enabledToBool : Enabled -> Bool
+enabledToBool v =
+    case v of
+        Enabled ->
+            True
+
+        Disabled ->
+            False
+
+
 type Status
-    = Configuring Input
+    = Configuring Input Untouched
     | Initalized ValidInput
     | Recording Item DownCounter
     | WentWrong Item String
@@ -99,6 +119,7 @@ initialStatus =
         { title = Nothing
         , length = Ok defaultSecs
         }
+        Untouched
 
 
 initialModel : Model
@@ -119,34 +140,34 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ status, nextId } as model) =
     let
         toTitle s =
-            case s of
+            case String.trim s of
                 "" ->
-                    Nothing
+                    Just (Err s)
 
                 _ ->
-                    Just s
+                    Just (Ok s)
 
         toLength s =
             Result.fromMaybe s (Maybe.map (max minSecs << min maxSecs) (String.toInt s))
 
         toStatus ({ title, length } as input) =
             case ( title, length ) of
-                ( Just t, Ok l ) ->
+                ( Just (Ok t), Ok l ) ->
                     Initalized { title = t, length = l }
 
                 _ ->
-                    Configuring input
+                    Configuring input Touched
 
         toInput validInput =
-            { title = Just validInput.title
+            { title = Just (Ok validInput.title)
             , length = Ok validInput.length
             }
     in
     case ( status, msg ) of
-        ( Configuring input, TitleChanged s ) ->
+        ( Configuring input _, TitleChanged s ) ->
             ( { model | status = toStatus { input | title = toTitle s } }, Cmd.none )
 
-        ( Configuring input, LengthChanged s ) ->
+        ( Configuring input _, LengthChanged s ) ->
             ( { model | status = toStatus { input | length = toLength s } }, Cmd.none )
 
         ( Initalized valid, TitleChanged s ) ->
@@ -169,7 +190,7 @@ update msg ({ status, nextId } as model) =
         ( Initalized { title, length }, FromRecorder (Ok (StartedEvent id)) ) ->
             let
                 item =
-                    { title = title
+                    { title = String.trim title
                     , length = length
                     , id = id
                     , size = Nothing
@@ -245,37 +266,12 @@ update msg ({ status, nextId } as model) =
 view : Model -> Html Msg
 view ({ status } as model) =
     let
-        ( recTitle, recLength, inputsDisabled ) =
-            case status of
-                Configuring { title, length } ->
-                    ( Maybe.withDefault "" title
-                    , case length of
-                        Ok l ->
-                            String.fromInt l
-
-                        Err s ->
-                            s
-                    , False
-                    )
-
-                Initalized { title, length } ->
-                    ( title, String.fromInt length, False )
-
-                Recording { title, length } _ ->
-                    ( title, String.fromInt length, True )
-
-                Success { title, length } ->
-                    ( title, String.fromInt length, True )
-
-                WentWrong { title, length } err ->
-                    ( title, String.fromInt length, True )
-
         buttonView t msg isDisabled =
             case isDisabled of
-                True ->
+                Disabled ->
                     button [ disabled True, title t ] [ text t ]
 
-                False ->
+                Enabled ->
                     button [ onClick msg, title t ] [ text t ]
 
         buttonsView =
@@ -283,20 +279,23 @@ view ({ status } as model) =
                 recBtn isDisabled =
                     buttonView "Record" RecordClicked isDisabled
 
-                stopBtn s isDisabled =
-                    buttonView s StopClicked isDisabled
+                stopBtn isDisabled =
+                    buttonView "Stop" StopClicked isDisabled
 
                 resetBtn isDisabled =
                     buttonView "Reset" ResetClicked isDisabled
+
+                downStopBtn s isDisabled =
+                    buttonView s StopClicked isDisabled
             in
             case status of
-                Configuring _ ->
+                Configuring _ _ ->
                     div []
-                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
+                        [ recBtn Disabled, stopBtn Disabled, resetBtn Enabled ]
 
                 Initalized s ->
                     div []
-                        [ recBtn False, stopBtn "Stop" True, resetBtn False ]
+                        [ recBtn Enabled, stopBtn Disabled, resetBtn Enabled ]
 
                 Recording item (DownCounter n) ->
                     let
@@ -304,19 +303,19 @@ view ({ status } as model) =
                             "Stop (" ++ String.fromInt n ++ ")"
                     in
                     div []
-                        [ recBtn True, stopBtn s False, resetBtn False ]
+                        [ recBtn Disabled, downStopBtn s Enabled, resetBtn Enabled ]
 
                 WentWrong item err ->
                     div []
-                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
+                        [ recBtn Disabled, stopBtn Disabled, resetBtn Enabled ]
 
                 Success item ->
                     div []
-                        [ recBtn True, stopBtn "Stop" True, resetBtn False ]
+                        [ recBtn Disabled, stopBtn Disabled, resetBtn Enabled ]
 
         audioView =
             case status of
-                Success { url, mime } ->
+                Success { title, url, mime } ->
                     case ( url, mime ) of
                         ( Just source, Just mtype ) ->
                             let
@@ -331,7 +330,7 @@ view ({ status } as model) =
                                     ]
                                     []
                                 , p []
-                                    [ a [ href source, download (recTitle ++ "." ++ ext) ] [ text "Download" ]
+                                    [ a [ href source, download (title ++ "." ++ ext) ] [ text "Download" ]
                                     ]
                                 ]
 
@@ -342,17 +341,83 @@ view ({ status } as model) =
                     text ""
     in
     div []
+        [ inputsView status
+        , buttonsView
+        , audioView
+        , pre
+            []
+            [ text << Debug.toString <| model.status ]
+        ]
+
+
+inputsView : Status -> Html Msg
+inputsView status =
+    let
+        ( ( title_, titleErr ), ( length_, lengthErr ), inputsDisabled ) =
+            case status of
+                Configuring { title, length } untouched ->
+                    let
+                        ifTouched =
+                            case untouched of
+                                Untouched ->
+                                    always Nothing
+
+                                Touched ->
+                                    Just
+                    in
+                    ( case title of
+                        Just (Ok t) ->
+                            ( t, Nothing )
+
+                        Just (Err t) ->
+                            ( t, ifTouched "Required." )
+
+                        Nothing ->
+                            ( "", ifTouched "Required." )
+                    , case length of
+                        Ok l ->
+                            ( String.fromInt l, Nothing )
+
+                        Err s ->
+                            ( s
+                            , ifTouched <| "Must be a whole number between " ++ String.fromInt minSecs ++ " and " ++ String.fromInt maxSecs
+                            )
+                    , Enabled
+                    )
+
+                Initalized { title, length } ->
+                    ( ( title, Nothing ), ( String.fromInt length, Nothing ), Enabled )
+
+                Recording { title, length } _ ->
+                    ( ( title, Nothing ), ( String.fromInt length, Nothing ), Disabled )
+
+                Success { title, length } ->
+                    ( ( title, Nothing ), ( String.fromInt length, Nothing ), Disabled )
+
+                WentWrong { title, length } err ->
+                    ( ( title, Nothing ), ( String.fromInt length, Nothing ), Disabled )
+
+        inputError m =
+            case m of
+                Just err ->
+                    span [ style "margin-left" "5px", style "color" "red" ] [ text err ]
+
+                Nothing ->
+                    text ""
+    in
+    div []
         [ p []
             [ label [ style "display" "block", for "title" ] [ text "Title of recording" ]
             , input
                 [ type_ "text"
                 , name "title"
-                , value recTitle
-                , disabled inputsDisabled
+                , value title_
+                , (disabled << not << enabledToBool) inputsDisabled
                 , placeholder "Type here.."
                 , onInput TitleChanged
                 ]
                 []
+            , inputError titleErr
             ]
         , p
             []
@@ -360,17 +425,13 @@ view ({ status } as model) =
             , input
                 [ type_ "number"
                 , name "length"
-                , value recLength
-                , disabled inputsDisabled
+                , value length_
+                , (disabled << not << enabledToBool) inputsDisabled
                 , onInput LengthChanged
                 ]
                 []
+            , inputError lengthErr
             ]
-        , buttonsView
-        , audioView
-        , pre
-            []
-            [ text << Debug.toString <| model.status ]
         ]
 
 
